@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ## Purpose
 
 The purpose of this script is to take the file with manually identified cryptic exon coordinates and use those coordinates to identify left and right junction PSIs in the different conditions for i3N. 
@@ -16,7 +17,7 @@ The purpose of this script is to take the file with manually identified cryptic 
 ## Packages
 
 ```{r packages}
-CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis")
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -178,7 +179,6 @@ cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
 write.csv(cryptic_df,"250329_CrypticCoordinates_Fill.csv", row.names = F)
 ```
 
-
 # Visualization
 
 ```{r pieChartFx}
@@ -229,7 +229,7 @@ cryptic_df <- cryptic_df %>% mutate(Cassette = ifelse(is.na(`Start Site`) &
   pivot_longer(cols = c(12:15), names_to = "Type", values_to = "YN") %>% 
   filter(!is.na(YN)) %>% dplyr::select(!YN) 
 # write.csv(cryptic_df,"250329_CrypticCoordinates_Vis.csv", row.names = F)
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+
 
 pieChartFx(cryptic_df$Type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
 ggsave("output_fig/250329_CE_All.png",device = "png", 
@@ -252,32 +252,8 @@ ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png",
 table(cryptic_df$`Annotated Alternate Exon`)
 
 # NMD reveal
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
-cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
-                                    NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
-                                    NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
-                                    NMDonly1pct = ifelse(avgT <= 1, "1pct", "TDPKDonly")) %>%
-  pivot_longer(cols=c("NMDonly10pct","NMDonly5pct","NMDonly1pct"), 
-               names_to = "NMDonly", values_to = "category",
-               names_prefix = "NMDonly") %>% 
-  mutate(category = ifelse(is.na(category), NMDonly, category),
-         category = ifelse(category == "TDPKDonly","TDPKDonly","NMDi"),
-         NMDonly = factor(NMDonly, c("10pct","5pct","1pct"))) 
-
-cryptic_df %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
-  theme_classic()+ xlab("") + ylab("# CEs") +
-  theme(text = element_text(size = 14, family = "Helvetica"), 
-        axis.ticks.x = element_blank(), 
-        axis.title = element_text(size = 20, family = "Helvetica", color = "black")) +
-  scale_y_continuous(expand = c(0, 0),limits = c(0,400))+
-  scale_fill_manual(values = c("#D1D1D1","#262626"))
-ggsave("output_fig/250409_NMDi_Effect_PctCutoffs.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
-
-
-
-
-
+cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 1, "Y", "N"), 
+                                    NMDonly = ifelse(is.na(avgT), "Y", NMDonly))
 pieChartFx(cryptic_df$NMDonly)
 ggsave("output_fig/250329_Pie_NMDiReveal_1pctcutoff.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
@@ -388,8 +364,6 @@ ggsave("output_fig/250329_chrPmbp.png",device = "png",
 ## High expressors
 cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
 cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
-
-# Top 20 CEs
 cryptic_df_high <- cryptic_df_high[,c(1:16,39:61)] %>% 
   arrange(maxTDP) %>% top_n(20) %>%
   pivot_longer(17:26, names_to = "condition", 
@@ -408,20 +382,6 @@ cryptic_df_high %>%
 ggsave("output_fig/250329_top20_highExp.png",device = "png", 
        width = 50, height = 25, units = "cm",limitsize = FALSE)
 
-# High expressor gene expression across tissues
-nauc <- read_delim("data/gtex_nauc.csv")
-cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
-
-nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>% 
-  pivot_longer(3:58, names_to = "tissue", values_to = "nauc") %>%
-  mutate(nauc = ifelse(nauc >=10, 10, nauc))
-
-nauc_highCE_mat <- nauc_highCE[-1] %>% pivot_wider(names_from="tissue", values_from="nauc") %>% column_to_rownames(var="gene_symbol")
-
-pheatmap(nauc_highCE_mat, color = rocket(100),border_color = NA, 
-         cluster_cols = F, treeheight_row = 0, treeheight_col = 0,
-         angle_col = "90", filename = "output_fig/250329_topExp_TissueExp.png",
-         width = 10, height =10)
 
 ```
 
