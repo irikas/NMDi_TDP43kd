@@ -1,0 +1,403 @@
+---
+title: "250329_CrypticPSIfill"
+author: "Irika Sinha"
+date: "2025-02-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the file with manually identified cryptic exon coordinates and use those coordinates to identify left and right junction PSIs in the different conditions for i3N. 
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+#library("clusterProfiler","org.Hs.eg.db")
+
+```
+
+## Merge sj files together
+
+```{r mergeSJ}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
+### Load cryptic files
+cryptic_df <- read_delim("250325_CrypticCoordinates.csv")[1:19]
+
+# Clean up junctions
+for(i in c(5:6,17:18)){
+  cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = ",", replacement = "", x = x))
+  cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = " ", replacement = "", x = x))
+  rm(i)
+}
+uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
+                         cryptic_df$LeftJunction, cryptic_df$RightJunction))
+uniqueJunctions = unlist(as.list(str_split(uniqueJunctions,";")))
+
+### Create empty dataframe
+finaldf <- data.frame()
+
+### Load .sj files
+for(i in list.files("SJfiles/")){
+  condName = gsub(pattern=".sj",replacement="",x = i)
+  tempdf <- read_delim(paste0("SJfiles/",i),col_names =F,lazy = T) %>% mutate(Condition = condName,
+                                                                     Coordinates = paste0(X1,":",X2,"-",X3)) %>%
+    filter(Coordinates %in% uniqueJunctions)
+  finaldf <- rbind(finaldf,tempdf,col_names = F)
+  rm(i,condName,tempdf)
+}
+
+finaldf <- cbind(finaldf, apply(tibble(finaldf$Condition),MARGIN = 2, 
+                          function(x) str_split_i(string = x, pattern = "[:digit:]",i=1)))
+finaldf <- finaldf %>% dplyr::select(!Condition)
+finaldf <- finaldf[4:11] %>% relocate(Coordinates, .before=1)
+colnames(finaldf)[2:8] <- c("Strand","IntronMotif","Annotated","UniqueMap","MultiMap","MaxOverhang","Condition")
+
+
+finaldf <- finaldf %>% dplyr::select(!Annotated) %>% 
+  mutate(Strand = ifelse(Strand == 1, "+", ifelse(Strand == 2, "-","Undef"))) %>%
+  mutate(IntronMotif = ifelse(IntronMotif == 0, "noncanonical",
+                              ifelse(IntronMotif ==1, "GT/AG",
+                                     ifelse(IntronMotif == 2, "CT/AC",
+                                            ifelse(IntronMotif == 3, "GC/AG",
+                                                   ifelse(IntronMotif == 4, "CT/GC",
+                                                          ifelse(IntronMotif == 5, "AT/AC",
+                                                                 ifelse(IntronMotif == 6, "GT/AT", "noncanonical"))))))))
+finaldf <- finaldf %>% filter(Condition != "FALSE") %>% 
+  pivot_wider(names_from = "Condition", 
+              values_from = "UniqueMap", 
+              values_fn = function(x) mean(x, na.rm=T), 
+              id_cols = "Coordinates")
+
+write.csv(finaldf,"250325_SpliceJunctions_Cleaned.csv",row.names = F)
+write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"250325_TestJunctions.csv")
+```
+
+```{r calcPSI}
+
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
+junctionCountdf <- read_delim("250325_SpliceJunctions_Cleaned.csv")
+
+uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
+                         cryptic_df$LeftJunction, cryptic_df$RightJunction))
+uniqueJunctions = unlist(as.list(str_split(cryptic_df$LeftJunction,";")))
+
+cryptic_df_fill = cryptic_df
+cryptic_df_fill[,20:41] = NA
+colnames(cryptic_df_fill)[20:30] = paste0("LPSI_",colnames(junctionCountdf)[2:12])
+colnames(cryptic_df_fill)[31:41] = paste0("RPSI_",colnames(junctionCountdf)[2:12])
+
+for(i in 1:nrow(cryptic_df_fill)){
+  ### LPSI 
+  if(!is.na(cryptic_df_fill$LeftJunction[i])){
+    # Identify inclusion Counts
+    incJunc = unlist(as.list(str_split(cryptic_df_fill$LeftJunction[i],";")))
+    incdf = junctionCountdf[which(junctionCountdf$Coordinates %in% incJunc),] %>% 
+      dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+    incdf[is.na(incdf)] = 0
+    
+    # Identify exclusion counts
+    excJunc = unlist(as.list(str_split(cryptic_df_fill$`Canonical Splice Junction`[i],";")))
+    excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% excJunc),] %>% 
+      dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+    excdf[is.na(excdf)] = 0
+    
+    # Calculate PSI
+    psiCount = round((incdf/(excdf+incdf))*100,1)
+    cryptic_df_fill[i,20:30] = t(as.matrix(psiCount))
+  }
+  
+  ### RPSI 
+  if(!is.na(cryptic_df_fill$RightJunction[i])){
+    # Identify inclusion Counts
+    incJunc = unlist(as.list(str_split(cryptic_df_fill$RightJunction[i],";")))
+    incdf = junctionCountdf[which(junctionCountdf$Coordinates %in% incJunc),] %>% 
+      dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+    incdf[is.na(incdf)] = 0
+    
+    # Identify exclusion counts
+    excJunc = unlist(as.list(str_split(cryptic_df_fill$`Canonical Splice Junction`[i],";")))
+    excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% excJunc),] %>% 
+      dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+    excdf[is.na(excdf)] = 0
+    
+    # Calculate PSI
+    psiCount = round((incdf/(excdf+incdf))*100,1)
+    cryptic_df_fill[i,31:41] = t(as.matrix(psiCount))
+  } 
+}
+
+cryptic_df_fill <- cryptic_df_fill %>% arrange(`Gene Symbol`)
+write.csv(cryptic_df_fill,"output_tables/250329_CrypticCoordinates.csv", row.names = F)
+
+```
+
+```{r SummaryColumns}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
+cryptic_df <- read_delim("250329_CrypticCoordinates.csv")
+
+for(i in 20:41){
+  cryptic_df[which(cryptic_df[,i] == "NaN"),i] = NA
+  rm(i)
+}
+
+# Add control avg
+cond = unique(str_split_i(colnames(cryptic_df)[20:41],"_",2))
+cryptic_df$avgCtrl = round(apply(cryptic_df %>% dplyr::select(LPSI_C,RPSI_C,LPSI_SgC,RPSI_SgC), 1, 
+                                    function(x) mean(x, na.rm=T)),1)
+
+# Add shTDP avg
+cryptic_df$avgT = round(apply(cryptic_df %>% dplyr::select(LPSI_T,RPSI_T), 1, 
+                                    function(x) mean(x, na.rm=T)),1)
+# Add condition avg
+for(i in cond[-c(1,6:7)]){
+  cryptic_df$newAvg = round(apply(cryptic_df %>% dplyr::select(contains(paste0("_",i))), 1, 
+                                  function(x) mean(x, na.rm=T)),1)
+  colnames(cryptic_df)[ncol(cryptic_df)] = paste0("avg",i)
+  rm(i)
+}
+
+# Add max
+cryptic_df$maxCtrl = apply(cryptic_df %>% dplyr::select(contains("avgC")),1,function(x) max(x, na.rm=T))
+cryptic_df$maxTDP = apply(cryptic_df %>% dplyr::select(contains("avgT")),1,function(x) max(x, na.rm=T))
+cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
+
+write.csv(cryptic_df,"250329_CrypticCoordinates_Fill.csv", row.names = F)
+```
+
+
+# Visualization
+
+```{r pieChartFx}
+### Pie chart of the proportions of types
+
+pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
+  ### Pie chart of the proportions of types
+  propdf <- data.frame(table(dfCol,useNA="always"))
+  colnames(propdf) = c("Value","Count")
+  if(naValue){
+    propdf$Value = c("Y","N")
+  }
+  
+  # Compute percentages
+  propdf$fraction = propdf$Count / sum( propdf$Count)
+  
+  # Compute a good label
+  propdf$label <- propdf$Value
+
+  # Label locations
+  propdf$ymax = cumsum(propdf$fraction)
+  propdf$ymin = c(0, head(propdf$ymax, n=-1))
+  propdf$labelPosition <- (propdf$ymax + propdf$ymin) / 2
+
+  # Plot proportion of each type
+  p <- ggplot(propdf, aes(ymax=cumsum(propdf$fraction), ymin=c(0, head(cumsum(propdf$fraction), n=-1)), xmax=4, xmin=3, fill=label)) +
+    geom_rect() +
+    #geom_text( x=4.3, aes(y=labelPosition, label=label, color=label), size=3) + # x here controls label position (inner / outer)
+    scale_color_manual(values = rep("black",nrow(propdf)))+
+    scale_fill_manual(values = cols)+
+    #scale_fill_brewer(palette=4) +
+    coord_polar(theta="y",start = 90) +
+    theme(text = element_text(family = "Helvetica"))+
+    xlim(c(2, 4)) +
+    theme_void() +
+    theme(legend.position = "none")
+  return(p)
+}
+```
+
+```{r VisPieChart}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Fill.csv")
+cryptic_df <- cryptic_df %>% mutate(Cassette = ifelse(is.na(`Start Site`) & 
+                                                        is.na(PolyA) &
+                                                        is.na(`Exon Ext.`),"Y",NA)) %>%
+  relocate(Cassette, .after = `Exon Ext.`) %>% 
+  pivot_longer(cols = c(12:15), names_to = "Type", values_to = "YN") %>% 
+  filter(!is.na(YN)) %>% dplyr::select(!YN) 
+# write.csv(cryptic_df,"250329_CrypticCoordinates_Vis.csv", row.names = F)
+
+
+pieChartFx(cryptic_df$Type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
+ggsave("output_fig/250329_CE_All.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$Type)
+
+pieChartFx(cryptic_df$`Inf. Ins.`, naValue = T)
+ggsave("output_fig/250329_Pie_InFrame_CE.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$`Inf. Ins.`)
+
+pieChartFx(cryptic_df$UTR, naValue = T)
+ggsave("output_fig/250329_Pie_UTR_CE.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$UTR)
+
+pieChartFx(cryptic_df$`Annotated Alternate Exon`, naValue = T)
+ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$`Annotated Alternate Exon`)
+
+# NMD reveal
+cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 1, "Y", "N"), 
+                                    NMDonly = ifelse(is.na(avgT), "Y", NMDonly))
+pieChartFx(cryptic_df$NMDonly)
+ggsave("output_fig/250329_Pie_NMDiReveal_1pctcutoff.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$NMDonly)
+
+cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 5, "Y", "N"), 
+                                    NMDonly = ifelse(is.na(avgT), "Y", NMDonly))
+pieChartFx(cryptic_df$NMDonly)
+ggsave("output_fig/250329_Pie_NMDiReveal_5pctcutoff.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+table(cryptic_df$NMDonly)
+
+
+### Plots to look at dPSI as a result of NMDi 
+### Comparison to TDP-43 KD only
+cryptic_df_dNMD <- cryptic_df[,c(1:16,39:51)] %>% 
+  pivot_longer(17:26, names_to = "condition", names_prefix = "avg", values_to = "PSI")
+cryptic_df_dNMD_avgT <- cryptic_df_dNMD %>% filter(condition == "T")
+cryptic_df_dNMD_avgNMD <- cryptic_df_dNMD %>% filter(condition != "T") %>% 
+  mutate(facetCol = condition)
+cond <- unique(cryptic_df_dNMD$condition)
+
+for(i in cond){
+  cryptic_df_dNMD_avgNMD <- rbind(cryptic_df_dNMD_avgNMD, 
+                                  cryptic_df_dNMD_avgT %>% mutate(facetCol = i))
+  rm(i)
+}
+
+cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
+  mutate(facetCol = factor(facetCol, levels=c("TXS","TX","TUS","TXU"))) %>%
+  ggplot(aes(x = condition, y = PSI)) +
+  geom_line(aes(group=`ID #`), alpha = 0.07) +
+  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
+               outlier.color = "#444444",outlier.size = 1) +
+  theme_classic()+ xlab("") + ylab("Average R/L PSI") +
+  theme(text = element_text(size = 14, family = "Helvetica"), 
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        axis.title = element_text(size = 20, family = "Helvetica", color = "black"),
+        plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
+        strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
+        strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
+  facet_wrap(~ facetCol, scales = "free_x", ncol = 4) 
+ggsave("output_fig/250329_NMDi_Effect_Paired.png",device = "png", 
+       width = 50, height = 30, units = "cm",limitsize = FALSE)
+
+
+cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
+  mutate(condition = factor(condition, levels=c("T","TXS","TX","TUS","TXU"))) %>%
+  ggplot(aes(x = condition, y = PSI)) +
+  geom_line(aes(group=`ID #`, color=`ID #`), alpha = 0.3,linewidth=0.5) +
+  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
+               outlier.color = "#444444",outlier.size = 1) +
+  scale_color_viridis_d(option = "viridis")+
+  theme_classic()+ xlab("") + ylab("Average R/L PSI") +
+  theme(text = element_text(size = 25, family = "Helvetica"), legend.position = "none",
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        axis.title = element_text(size = 20, family = "Helvetica", color = "black"),
+        plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
+        strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
+        strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
+    stat_compare_means(label = "p.signif", method = "t.test", ref.group = "T")
+ggsave("output_fig/250329_NMDi_Effect_Stats.png",device = "png", 
+       width = 30, height = 30, units = "cm",limitsize = FALSE)
+
+### chr/mbp graph 
+chrLength <- read_delim("data/GRch38sequence_report.tsv") %>% 
+  filter(`Assembly-unit accession`=="Primary Assembly", 
+         `Sequence name` %in% c(seq(1,22,1),"X","Y"))
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df <- cryptic_df %>% mutate(diffCUS = avgCUS-avgCtrl,
+                      diffCX = avgCX-avgCtrl,
+                      diffCXS = avgCXS-avgCtrl,
+                      diffCXU = avgCXU-avgCtrl,
+                      diffT = avgT-avgT,
+                      diffTUS = avgTUS-avgT,
+                      diffTX = avgTX-avgT,
+                      diffTXS = avgTXS-avgT,
+                      diffTXU = avgTXU-avgT)  %>% 
+  mutate(chr = gsub("chr","",
+                    str_split_i(cryptic_df$`Canonical Splice Junction`,":",1))) %>%
+  mutate(chr = factor(chr, levels=c(seq(1,22,1),"X","Y")))
+ # write.csv(cryptic_df,"output_tables/250329_CrypticCoordinates_Vis.csv", row.names = F) # Overwrites the other file
+
+histcryptic <- data.frame(table(cryptic_df$chr))
+histcryptic <- left_join(histcryptic, chrLength, 
+                         by = join_by("Var1" == "Chromosome name")) %>%
+  mutate(chrM = Freq/`Seq length`, Var1 = factor(Var1, levels = c(seq(1,22,1),"X","Y"))) 
+
+histcryptic %>% 
+  ggplot(aes(x=Var1, y= chrM*(10^6)))+geom_col() +theme_classic()+ xlab("") +
+  ylab("CEs/Mbp") +scale_y_continuous(expand = c(0, 0)) +
+  theme(text = element_text(size = 25, family = "Helvetica", color = "black"),
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        axis.title = element_text(size = 20, family = "Helvetica", color = "black"),
+        plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
+        strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
+        strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))
+ggsave("output_fig/250329_chrPmbp.png",device = "png", 
+       width = 50, height = 25, units = "cm",limitsize = FALSE)
+```
+
+```{r HighExp}
+## High expressors
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
+
+# Top 20 CEs
+cryptic_df_high <- cryptic_df_high[,c(1:16,39:61)] %>% 
+  arrange(maxTDP) %>% top_n(20) %>%
+  pivot_longer(17:26, names_to = "condition", 
+               names_prefix = "avg", values_to = "PSI") %>%
+  mutate(PSI = ifelse(is.na(PSI),0,PSI)) %>%
+  mutate(condition = factor(condition, levels=rev(c("Ctrl", "CXS", "CX", "CUS", "CXU",
+                                                "T","TXS","TX","TUS","TXU"))))
+
+cryptic_df_high %>% 
+  mutate(yName = paste0(`Gene Symbol`,"_",`CE Detail`)) %>%
+  ggplot(aes(x=yName,y=condition,fill=PSI))+ geom_tile()+
+  theme_minimal() + xlab("") + ylab("") + 
+  theme(text = element_text(color="black", family="Helvetica", size =25),
+        axis.text.x = element_text(angle = 45, hjust=1))+
+  scale_fill_viridis_c(option = "F")
+ggsave("output_fig/250329_top20_highExp.png",device = "png", 
+       width = 50, height = 25, units = "cm",limitsize = FALSE)
+
+# High expressor gene expression across tissues
+nauc <- read_delim("data/gtex_nauc.csv")
+cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
+
+nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>% 
+  pivot_longer(3:58, names_to = "tissue", values_to = "nauc") %>%
+  mutate(nauc = ifelse(nauc >=10, 10, nauc))
+
+nauc_highCE_mat <- nauc_highCE[-1] %>% pivot_wider(names_from="tissue", values_from="nauc") %>% column_to_rownames(var="gene_symbol")
+
+pheatmap(nauc_highCE_mat, color = rocket(100),border_color = NA, 
+         cluster_cols = F, treeheight_row = 0, treeheight_col = 0,
+         angle_col = "90", filename = "output_fig/250329_topExp_TissueExp.png",
+         width = 10, height =10)
+
+```
+
