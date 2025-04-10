@@ -275,22 +275,6 @@ ggsave("output_fig/250409_NMDi_Effect_PctCutoffs.png",device = "png",
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 
 
-
-
-
-pieChartFx(cryptic_df$NMDonly)
-ggsave("output_fig/250329_Pie_NMDiReveal_1pctcutoff.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$NMDonly)
-
-cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 5, "Y", "N"), 
-                                    NMDonly = ifelse(is.na(avgT), "Y", NMDonly))
-pieChartFx(cryptic_df$NMDonly)
-ggsave("output_fig/250329_Pie_NMDiReveal_5pctcutoff.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$NMDonly)
-
-
 ### Plots to look at dPSI as a result of NMDi 
 ### Comparison to TDP-43 KD only
 cryptic_df_dNMD <- cryptic_df[,c(1:16,39:51)] %>% 
@@ -385,13 +369,16 @@ ggsave("output_fig/250329_chrPmbp.png",device = "png",
 ```
 
 ```{r HighExp}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
+
 ## High expressors
 cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
-cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
+cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
+write.csv(cryptic_df_high,"output_tables/250409_CrypticCoordinates_HighExp.csv")
 
-# Top 20 CEs
+# Top 30 CEs
 cryptic_df_high <- cryptic_df_high[,c(1:16,39:61)] %>% 
-  arrange(maxTDP) %>% top_n(20) %>%
+  arrange(desc(maxTDP)) %>% top_n(30,wt=maxTDP) %>%
   pivot_longer(17:26, names_to = "condition", 
                names_prefix = "avg", values_to = "PSI") %>%
   mutate(PSI = ifelse(is.na(PSI),0,PSI)) %>%
@@ -403,9 +390,9 @@ cryptic_df_high %>%
   ggplot(aes(x=yName,y=condition,fill=PSI))+ geom_tile()+
   theme_minimal() + xlab("") + ylab("") + 
   theme(text = element_text(color="black", family="Helvetica", size =25),
-        axis.text.x = element_text(angle = 45, hjust=1))+
+        axis.text.x = element_text(angle = 30, hjust=1))+
   scale_fill_viridis_c(option = "F")
-ggsave("output_fig/250329_top20_highExp.png",device = "png", 
+ggsave("output_fig/250409_top20_highExp.png",device = "png", 
        width = 50, height = 25, units = "cm",limitsize = FALSE)
 
 # High expressor gene expression across tissues
