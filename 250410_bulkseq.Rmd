@@ -1,0 +1,47 @@
+---
+title: "250410_GEX"
+author: "Irika Sinha"
+date: "2025-04-11"
+output: html_document
+---
+---
+title: "250329_CrypticPSIfill"
+author: "Irika Sinha"
+date: "2025-02-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the file with manually identified cryptic exon coordinates and use those coordinates to identify left and right junction PSIs in the different conditions for i3N. 
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis")
+biocPackages <- c("clusterProfiler","org.Hs.eg.db")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+
+```

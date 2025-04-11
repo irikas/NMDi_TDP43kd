@@ -16,7 +16,7 @@ The purpose of this script is to take the file with manually identified cryptic 
 ## Packages
 
 ```{r packages}
-CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis")
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","pheatmap")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -177,7 +177,6 @@ cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
 
 write.csv(cryptic_df,"250329_CrypticCoordinates_Fill.csv", row.names = F)
 ```
-
 
 # Visualization
 
