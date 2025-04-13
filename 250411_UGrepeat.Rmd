@@ -1,0 +1,288 @@
+---
+title: "250411_UGrepeat"
+author: "Irika Sinha"
+date: "2025-04-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to determine the location of UG repeats near cryptic exons
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "XML","ggplot2", "ggpubr", "ggstats","BiocManager","viridis", "gghighlight")
+biocPackages <- c("Biostrings")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+## Method of UG repeat calculation
+Source:
+McClory SP, Lynch KW, Ling JP. HnRNP L represses cryptic exons. RNA. 2018 Jun;24(6):761-768. doi: 10.1261/rna.065508.117. Epub 2018 Mar 26. PMID: 29581412; PMCID: PMC5959245.
+
+As per text:
+"Calculation of repeat frequency around hnRNP L-repressed cryptic exons in Figure 2B was done by 
+
+(i) Masking all “CA” and “AC” as “YY”; 
+(ii) replacing all “A,” “C,” “T,” “G” as “N”; 
+(iii) identifying all pentamer and longer repeat sequences allowing for a single N insertion (i.e., “YYYYY,” “YYYYYY,” “YYYYYYY,” “YNYYYY,” “YYNYYY,” “YYYNYY,” “YYYYNY,” …); 
+(iv) assigning the “Y”s in sequences from step 3 a value of 1 and all other sequences a value of 0; 
+(v) aligning all sequences to the 3′SS and 5′SS and calculating the repeat frequency for each base pair position (i.e., sum vertically and divide by the total number of sequences). 
+
+Repeat frequencies for UG repeats (TDP-43) and CU repeats (PTBP1/PTBP2) were derived in a similar fashion."
+
+
+```{r functions}
+
+dinucRepeatBinary <- function(testseq, motif="TG"){
+  ## Catch NAs
+if(is.na(testseq)){
+  return(NA)
+}
+  
+pattern1 = motif
+pattern2 = Biostrings::reverse(motif)
+
+  ## Step 1: Masking all “UG” and “GU” as “YY” or given pattern
+testseq_mask1 <- str_replace_all(string = testseq, pattern = pattern1, replacement = "YY")
+testseq_mask2 <- str_replace_all(string = testseq, pattern = pattern2, replacement = "YY")
+
+testseq_mask = c()
+
+## Step 2: Replacing all non-Y nucleotides as “N”; 
+# Combining masks too
+for(i in 1:str_length(testseq)){
+  if(str_split_i(testseq_mask1,"",i) == "Y" | str_split_i(testseq_mask2,"",i) == "Y"){
+    testseq_mask[i] = "Y"
+  } else{testseq_mask[i] = "N"}
+  rm(i)
+}
+
+testseq_mask <- str_flatten(testseq_mask)
+rm(testseq_mask1, testseq_mask2)
+
+## Step3: Identifying all pentamer and longer repeat sequences allowing for a single N insertion (i.e., “YYYYY,” “YYYYYY,” “YYYYYYY,” “YNYYYY,” “YYNYYY,” “YYYNYY,” “YYYYNY,” …); 
+testseq_mask_list <- unlist(str_split(testseq_mask,""))
+
+testseq_num <- c()
+counter = 0
+
+for(i in 1:length(testseq_mask_list)){
+  currentVal = testseq_mask_list[i]
+  pastVal = testseq_mask_list[i-1]
+  nextVal = testseq_mask_list[i+1]
+  
+  if(currentVal == "Y"){
+    counter = counter + 1
+    
+    # Deal with right edge
+    if(i == length(testseq_mask_list)){
+      if(counter >= 5){
+        testseq_num <- append(testseq_num, c(rep(1,counter)))
+      } else{
+        testseq_num <- append(testseq_num, c(rep(0,counter)))
+      }
+      rm(counter)
+    }
+    
+# Deal with various locations of "N"
+  } else if(i == 1){
+    # Deal with left edge
+    testseq_num <- append(testseq_num, 0)
+    counter=0
+  } else if(i < length(testseq_mask_list)){
+    # Deal with embedded N
+    if(pastVal == "Y" & nextVal == "Y"){
+      counter = counter + 1
+    } else{
+    # Deal with N not included in a repeat
+      if(counter >= 5){
+        testseq_num <- append(testseq_num, c(rep(1,counter),0))
+      } else{
+        testseq_num <- append(testseq_num, c(rep(0,counter),0))
+      }
+      counter = 0
+    }
+  } else if(i == length(testseq_mask_list)){
+    if(counter >= 5){
+      testseq_num <- append(testseq_num, c(rep(1,counter),0))
+    } else{
+      testseq_num <- append(testseq_num, c(rep(0,counter),0))
+    }
+    
+    rm(counter)
+  }
+  rm(i, currentVal, pastVal, nextVal)
+}
+return(str_flatten(testseq_num))
+}
+
+```
+
+```{r seq, eval=F}
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Fill.csv")
+cryptic_df_coord <- cryptic_df[,c(1:4,6,18,19)] %>% mutate(leftRegion = NA,
+                                                         rightRegion = NA)
+
+for(i in 1:nrow(cryptic_df_coord)){
+  if(!is.na(cryptic_df_coord$LeftJunction[i])){
+    chr = str_split_i(cryptic_df_coord$LeftJunction[i],":",1)
+    leftSplice = as.numeric(str_split_i(cryptic_df_coord$LeftJunction[i],"-",2))+50
+    cryptic_df_coord$leftRegion[i] = paste0(chr,":",leftSplice-650,",",leftSplice)
+    rm(leftSplice)
+  }
+  
+  if(!is.na(cryptic_df_coord$RightJunction[i])){
+    chr = str_split_i(cryptic_df_coord$RightJunction[i],":",1)
+    rightSplice = as.numeric(str_split_i(str_split_i(cryptic_df_coord$RightJunction[i],":",2),"-",1))-50
+    cryptic_df_coord$rightRegion[i] = paste0(chr,":",rightSplice,",",rightSplice+650)
+    rm(rightSplice)
+  }
+  
+  rm(i)
+}
+
+manualFixL = which(str_split_i(cryptic_df_coord$leftRegion,":",2) == "NA,NA")
+manualFixR = which(str_split_i(cryptic_df_coord$rightRegion,":",2) == "NA,NA") # No problems
+
+for(i in 1:length(manualFixL)){
+  CE = cryptic_df_coord$`Cryptic Exon Location\n  (hg38)`[manualFixL[i]]
+  chr = str_split_i(CE,":",1)
+  leftSplice = as.numeric(str_split_i(CE,"-",2))+49
+  cryptic_df_coord$leftRegion[manualFixL[i]] = paste0(chr,":",leftSplice-650,",",leftSplice)
+  rm(CE,i, leftSplice, chr)
+}
+
+cryptic_df_coord <- cryptic_df_coord %>% mutate(urlL = paste0("http://genome.ucsc.edu/cgi-bin/das/hg38/dna?segment=",leftRegion),
+                                                urlR = paste0("http://genome.ucsc.edu/cgi-bin/das/hg38/dna?segment=",rightRegion))
+
+cryptic_df_coord$urlL[which(is.na(cryptic_df_coord$LeftJunction))] = NA
+cryptic_df_coord$urlR[which(is.na(cryptic_df_coord$RightJunction))] = NA
+
+
+
+# write_delim(cryptic_df_coord[,9], "output_tables/250411_cryptic_df_coord_left.txt", col_names = F)
+# write_delim(cryptic_df_coord[,10], "output_tables/250411_cryptic_df_coord_right.txt", col_names = F)
+```
+
+
+## Download seq from UCSC
+
+BASH ISN'T WORKING
+```{bash seq, eval=F}
+cd output_tables
+> 250411_cryptic_df_coord_left_fill.txt
+> 250411_cryptic_df_coord_right_fill.txt
+
+while read urlLine; do
+  curl -s $urlLine  | xmllint --xpath '/DASDNA/SEQUENCE/DNA/text()' - | tr -d '\n' >> 250411_cryptic_df_coord_left_fill.txt
+  echo "\n" >> 250411_cryptic_df_coord_left_fill.txt
+done < 250411_cryptic_df_coord_left.txt
+
+while read urlLine; do
+  curl -s $urlLine  | xmllint --xpath '/DASDNA/SEQUENCE/DNA/text()' - | tr -d '\n' >> 250411_cryptic_df_coord_right_fill.txt
+  echo "\n" >> 250411_cryptic_df_coord_right_fill.txt
+done < 250411_cryptic_df_coord_right.txt
+
+```
+
+Download XML files from UCSC genome browser to get relevant sequences
+```{r seqDownload, eval=F}
+
+cryptic_df_coord <- cryptic_df_coord %>% mutate(seqL = NA, seqR = NA)
+
+for(i in 1:nrow(cryptic_df_coord)){
+  for(j in c("urlL","urlR")){
+    if(!is.na(cryptic_df_coord[[j]][i])){
+      xmlF <- read.csv(cryptic_df_coord[[j]][i])
+      xmlF <- xmlF[5:(nrow(xmlF)-3),]
+    
+      seq <- str_flatten(xmlF)
+    
+      if(j == "urlL"){
+        cryptic_df_coord$seqL[i] = seq
+      } else{cryptic_df_coord$seqR[i] = seq}
+    }
+  }
+  rm(j,i,xmlF,seq)
+}
+
+# write.csv(cryptic_df_coord,"output_tables/cryptic_df_coord_seqFill.csv")
+
+```
+
+## Use UGrepeat function
+```{r UGrepeatSeq}
+cryptic_df_coord <- cryptic_df_coord %>% mutate(seqRepL_UG = NA, seqRepR_UG = NA)
+
+cryptic_df_coord$seqRepL_UG <- unlist(lapply(toupper(cryptic_df_coord$seqL),dinucRepeatBinary))
+cryptic_df_coord$seqRepR_UG <- unlist(lapply(toupper(cryptic_df_coord$seqR),dinucRepeatBinary))
+
+# write.csv(cryptic_df_coord,"output_tables/250412_cryptic_df_coord_UGrepcalc.csv")
+
+mathUG_df_L <- data.frame("loc" = -600:50)
+mathUG_df_R <- data.frame("loc" = -50:600)
+
+for(i in 1:nrow(cryptic_df_coord)){
+  if(!is.na(cryptic_df_coord$seqRepL_UG[i])){
+    mathUG_df_L <- cbind(mathUG_df_L, as.numeric(unlist(str_split(cryptic_df_coord$seqRepL_UG[i],""))))
+    colnames(mathUG_df_L)[ncol(mathUG_df_L)] = cryptic_df_coord$`ID #`[i]
+  } 
+  
+  if(!is.na(cryptic_df_coord$seqRepR_UG[i])){
+    mathUG_df_R <- cbind(mathUG_df_R, as.numeric(unlist(str_split(cryptic_df_coord$seqRepR_UG[i],""))))
+    colnames(mathUG_df_R)[ncol(mathUG_df_R)] = cryptic_df_coord$`ID #`[i]
+  } 
+  rm(i)
+}
+
+mathUG_df_L$avg = apply(mathUG_df_L[,2:ncol(mathUG_df_L)],MARGIN=1,function(x) round(mean(x),3))
+mathUG_df_R$avg = apply(mathUG_df_R[,2:ncol(mathUG_df_R)],MARGIN=1,function(x) round(mean(x),3))
+
+# write.csv(mathUG_df_L, "output_tables/250412_cryptic_df_UG_freq_L.csv")
+# write.csv(mathUG_df_R, "output_tables/250412_cryptic_df_UG_freq_R.csv")
+
+
+
+ggplot(mathUG_df_R, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
+  theme_classic()+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.5))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+
+ggplot(mathUG_df_L, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
+  theme_classic()+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.5))+
+  scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+
+
+```
+
