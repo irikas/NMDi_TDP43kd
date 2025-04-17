@@ -4,12 +4,6 @@ author: "Irika Sinha"
 date: "2025-04-11"
 output: html_document
 ---
----
-title: "250329_CrypticPSIfill"
-author: "Irika Sinha"
-date: "2025-02-04"
-output: html_document
----
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -22,8 +16,8 @@ The purpose of this script is to take the file with manually identified cryptic 
 ## Packages
 
 ```{r packages}
-CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis")
-biocPackages <- c("clusterProfiler","org.Hs.eg.db")
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
+biocPackages <- c("apeglm", "DESeq2")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -43,5 +37,95 @@ for(i in biocPackages){
 
 rm(CRANpackages,biocPackages)
 
+```
+
+```{r DESeq2}
+# Data
+load("data/nmdi_all_deseq2.dds.RData")
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+
+# Add metadata
+colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
+colnames(dds@colData)[which(colnames(dds@colData) == "Group2")] = "Rep"
+dds@colData$NMDi = as.factor(c(rep("WT",2),rep("KD",8),rep("WT",4),rep("KD",8)))
+dds@colData$NMDi = factor(dds@colData$NMDi, levels =c("WT","KD"))
+dds@colData$tdp = as.factor(c(rep("WT",12),rep("KD",10)))
+dds@colData$tdp = factor(dds@colData$tdp, levels =c("WT","KD"))
+dds@colData$seqDate = as.factor(c(rep("batch1",10),rep("batch2",12)))
+design(dds) <- ~ tdp + NMDi + seqDate
+
+# saveRDS(dds, "data/nmdi_all_annotated_deseq2.dds.RDS")
+
+# Pre-filtering
+dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
+
+# all_counts <- as.data.frame(dds@assays@data@listData$counts) %>% rownames_to_column("gene") %>% 
+#   pivot_longer(cols=c(2:23), names_to = "condition", values_to = "count") %>%
+#   mutate(condition = str_split_i(condition,"_", 1))
+# 
+# all_counts %>% filter(gene %in% cryptic_df$`Ensembl ID`, str_detect(condition, "T|SgC"))%>% 
+#   ggplot(aes(x=condition,y=log10(count)))+
+#   #geom_jitter(width = 0.2)+
+#   geom_violin(draw_quantiles = c(0.5), scale="width") +theme_classic()
+
+
+# Analysis
+dds_noNMDi <- dds[,11:14]
+dds_noNMDi$tdp <- factor(dds_noNMDi$tdp, levels = c("WT","KD"))
+design(dds_noNMDi) <- ~ tdp
+dds_noNMDi <- DESeq(dds_noNMDi)
+res <- results(dds_noNMDi, contrast=c("tdp","KD","WT"))
+resLFC <- lfcShrink(dds_noNMDi, coef="tdp_KD_vs_WT", type="apeglm")
+resLFC <- data.frame(resLFC) %>% filter(!is.na(log2FoldChange)) %>% 
+  mutate(neglog10p = -log10(padj), 
+         geneType=NA, geneName=NA, TDPCE=NA, log2FoldChange_adj=log2FoldChange)
+
+# name fill column
+for(i in 1:nrow(cryptic_df)){
+  n = which(rownames(resLFC) == cryptic_df$`Ensembl ID`[i])
+  resLFC$geneType[n] = cryptic_df$Type[i]
+  resLFC$geneName[n] = cryptic_df$`Gene Symbol`[i]
+  resLFC$TDPCE[n] = 1-(cryptic_df$maxTDP[i]- cryptic_df$avgT[i])/100
+  
+  # ADJ
+  resLFC$log2FoldChange_adj[n] = resLFC$log2FoldChange[n] - log2((resLFC$TDPCE[n]+0.0001))
+  
+  rm(i)
+}
+
+resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange = ifelse(log2FoldChange < -5,-5, 
+                                          ifelse(log2FoldChange > 5, 5, log2FoldChange)),
+                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,geneName,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = geneName), 
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"))+
+  ylim(0,60)
+ggsave("output_fig/250413_Ctrl_TDPkd_GEx.png",device = "png", 
+       width = 50, height = 30, units = "cm",limitsize = FALSE)
+
+# Adjusted?
+resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange_adj = ifelse(log2FoldChange_adj < -2,-2, 
+                                          ifelse(log2FoldChange_adj > 2, 2, log2FoldChange_adj)),
+                  log2FoldChange = ifelse(log2FoldChange < -2,-2, 
+                                          ifelse(log2FoldChange > 2, 2, log2FoldChange)),
+                  geneName = ifelse(abs(log2FoldChange_adj-log2FoldChange)>1,geneName,"")) %>%
+  ggplot(aes(y=log2FoldChange_adj,x=log2FoldChange, color=factor(geneType)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = geneName),
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"),legend.position = "none")+
+  ylim(-2.5,2.5)+xlim(-2.5,2.5)
 
 ```
