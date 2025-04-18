@@ -128,4 +128,68 @@ resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
   theme(text = element_text(family="Helvetica"),legend.position = "none")+
   ylim(-2.5,2.5)+xlim(-2.5,2.5)
 
+## Create new dds object
+raw_counts <- data.frame(dds_noNMDi@assays@data@listData$counts)
+
+for(i in 1:nrow(cryptic_df)){
+  n = which(rownames(raw_counts) == cryptic_df$`Ensembl ID`[i])
+  tonly = ifelse(!is.na(cryptic_df$avgT[i]),cryptic_df$avgT[i],0)
+  TDPCE = 1-(cryptic_df$maxTDP[i]- tonly)/100
+  raw_counts$TDPKD_1[n] = as.integer(round((raw_counts$TDPKD_1[n])/TDPCE,0))
+  raw_counts$TDPKD_2[n] = as.integer(round((raw_counts$TDPKD_2[n])/TDPCE,0))
+  
+  rm(i, n, TDPCE)
+}
+
+dds_noNMDi_adj <- DESeqDataSetFromMatrix(countData = as.matrix(raw_counts),
+                              colData = dds_noNMDi@colData,
+                              design = ~ tdp)
+
+dds_noNMDi_adj <- DESeq(dds_noNMDi_adj)
+resLFC_adj <- lfcShrink(dds_noNMDi_adj, coef="tdp_KD_vs_WT", type="apeglm")
+resLFC_adj <- data.frame(resLFC_adj) %>% filter(!is.na(log2FoldChange)) %>% 
+  mutate(neglog10p = -log10(padj), 
+         geneType=NA, geneName=NA)
+
+for(i in 1:nrow(cryptic_df)){
+  n = which(rownames(resLFC_adj) == cryptic_df$`Ensembl ID`[i])
+  resLFC_adj$geneType[n] = cryptic_df$Type[i]
+  resLFC_adj$geneName[n] = cryptic_df$`Gene Symbol`[i]
+  rm(i)
+}
+
+resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange = ifelse(log2FoldChange < -5,-5, 
+                                          ifelse(log2FoldChange > 5, 5, log2FoldChange)),
+                  geneName = ifelse(neglog10p>20 & log2FoldChange < -1,geneName,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = geneName), 
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"))+
+  ylim(0,60)
+
+# All genes with neglog10p>20 & abs(log2FoldChange) > 1
+resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange = ifelse(log2FoldChange < -5,-5, 
+                                          ifelse(log2FoldChange > 5, 5, log2FoldChange)),
+                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,geneName,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = geneName), 
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"))+
+  ylim(0,60)
+
+
+
+
 ```
