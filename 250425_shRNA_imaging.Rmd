@@ -1,0 +1,208 @@
+---
+title: "250425_Nuclei_shRNA"
+author: "Irika Sinha"
+date: "2025-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the file with manually identified cryptic exon coordinates and use those coordinates to identify left and right junction PSIs in the different conditions for i3N. 
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2","gghighlight","ggpubr","ggrepel")
+
+# CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
+biocPackages <- c()
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+```{r data}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+# Load CellProfiler Output
+df <- read_delim("data/250424_DAPI_gray_nuclei.csv")[1:3]
+df_meta <- read_delim("data/250424_Image.csv") %>% 
+  dplyr::select(starts_with(c("ImageNumber","Count","ModuleError",
+                              "Metadata_plate","Metadata_well","FileName"))) %>% 
+  pivot_longer(cols=starts_with("ModuleError"),
+               names_to = "Module",names_prefix = "ModuleError",
+               values_to = "Error")
+
+# Clean metadata file
+# Were there any errors?
+which(df_meta$Error != 0)
+df_meta <- df_meta %>% dplyr::select(!c("Module","Error")) %>% unique()
+
+# WELL ID/shRNA
+# Images taken in a z pattern in B-E and 2-7
+key <- read_delim("data/250424_Key_shRNA.csv")
+
+## Create well map for images
+orderWellImage <- c(paste0("B",2:7),paste0("C",7:2),paste0("D",2:7),paste0("E",7:2))
+wellKey <- data.frame(plate = NA, well = orderWellImage, imgNs = NA,shRNA=NA)
+
+for(i in 1:nrow(wellKey)){
+  start = 6*(i-1)+1
+  end = 6*i
+  wellKey$imgNs[i] = list(start:end)
+  rm(start,end,i)
+}
+
+# 8 Plates
+wellkeyFull <- data.frame()
+for(i in 1:8){
+  wellkeyFull <- rbind(wellkeyFull,wellKey %>% mutate(plate = i))
+  rm(i)
+}
+
+# add shRNA
+for(i in 1:nrow(key)){
+  r = which(wellkeyFull$plate == key$Plate[i] & wellkeyFull$well == key$Well[i])
+  wellkeyFull$shRNA[r] = paste0(key$Gene[i],"_",key$CloneYing[i])
+  rm(r,i)
+}
+
+df_meta$shRNA = NA
+## Add gene names to metadata
+for(i in 1:nrow(df_meta)){
+  r = which(wellkeyFull$plate == as.numeric(df_meta$Metadata_plate[i]) & 
+              sapply(wellkeyFull$imgNs, 
+                     function(x) as.character(as.numeric(df_meta$Metadata_Well[i])) %in% x))
+  df_meta$shRNA[i] = wellkeyFull$shRNA[r]
+  rm(r,i)
+}
+
+```
+
+## Cell/Image QC
+```{r QC}
+df_meta$Metadata_plate <- as.character(df_meta$Metadata_plate)
+
+# There is significant plate to plate variation in the mean number of nuclei/well compared to the overall mean
+compare_means(Count_DAPI_gray_nuclei ~ Metadata_plate,  data = df_meta, ref.group = ".all.", method = "t.test")
+
+df_meta %>% ggplot(aes(x=as.character(Metadata_plate), y=Count_DAPI_gray_nuclei)) + 
+  geom_hline(yintercept = mean(df_meta$Count_DAPI_gray_nuclei),colour = "red",linetype = 2)+
+  geom_jitter(alpha=0.5, width = 0.2)+
+  geom_boxplot(alpha=0.9)+ theme_classic() + 
+  theme(plot.margin = margin(1,1,1,1, "cm"))+
+  stat_compare_means(method = "anova", label.y=950)+
+   stat_compare_means(label = "p.signif", method = "t.test",
+                     ref.group = ".all.")+xlab("# nuclei") +ylab("Plate")
+
+# Add total cells with PI (%) to df_meta
+df <- df %>% mutate(Children_PIstain_gray_bright_objects_Count = ifelse(Children_PIstain_gray_bright_objects_Count > 1, 1, Children_PIstain_gray_bright_objects_Count)) %>%
+  group_by(ImageNumber) %>% summarize(PIcells = sum(Children_PIstain_gray_bright_objects_Count))
+
+df_meta <- df_meta %>% left_join(df,by = "ImageNumber")
+
+## For each plate - score based on TDP-43 and ctrl (internal controls)
+# Calculate average PI of each shRNA by plate
+df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
+df_graph$Norm = NA 
+
+for(i in 1:8){
+  r = which(df_graph$Metadata_plate == as.character(i))
+  maxR = which(df_graph$Metadata_plate == as.character(i) & df_graph$shRNA == "TARDBP_shTDP-43")
+  minR = which(df_graph$Metadata_plate == as.character(i) & df_graph$shRNA == "Ctrl_shCTR")
+  max = median(df_graph$pctPI[maxR])
+  min = median(df_graph$pctPI[minR])
+  
+  df_graph$Norm[r] = round((df_graph$pctPI[r] - min)/(max-min),3)
+  rm(r,maxR,minR,max,min,i)
+}
+
+df_graph <- df_graph %>% mutate(gene = str_split_i(shRNA,"_",1))
+
+# Choose max toxicity to plot for multiple shRNAs
+df_MaxEfficacy <- df_graph %>% group_by(shRNA,gene) %>% summarize(maxVal=median(Norm)) %>%
+  mutate(filt = paste(gene,maxVal,sep="_"))
+df_MaxEfficacy_gene <- df_MaxEfficacy %>% group_by(gene) %>% summarize(maxMed = max(maxVal)) %>%
+  mutate(filt = paste(gene,maxMed,sep="_"))
+filtshRNA <- df_MaxEfficacy$shRNA[which(df_MaxEfficacy$filt %in% df_MaxEfficacy_gene$filt)]
+
+df_graph <- df_graph %>% filter(shRNA %in% filtshRNA)
+
+df_Calc <- df_graph %>% group_by(gene) %>% summarize(med= round(median(Norm),5))
+
+# visualize scores
+orderS <- unique((df_Calc %>% arrange(-med))$gene)
+
+df_graph %>% mutate(gene = factor(gene, levels = orderS)) %>% 
+  ggplot(aes(x=gene,y=Norm)) +
+  geom_hline(yintercept = c(0,1),linetype=2,color="#656565") +
+  geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
+  geom_boxplot(alpha=0.8, outliers = F,fill="#820000", color="black") +
+  # stat_compare_means(label = "p.signif", method = "t.test",
+  #                    ref.group = "Ctrl", hide.ns=T)+
+  gghighlight(gene %in% c("TARDBP","Ctrl"),
+              unhighlighted_params = list(color="#656565",fill="gray"),
+              use_group_by = F)+
+  theme_classic()+
+  theme(text = element_text(color="black", family = "Helvetica", size=15),
+        axis.text.x = element_text(angle = 45, hjust=1))+
+  xlab("")+ylab("% +PI Nuclei (normalized)")+
+  scale_y_continuous(expand=c(0,0), limits=c(-0.6,2.1),breaks = c(-0.5, -0.25,0, .25, .50, .75, 1.00, 1.25, 1.50,1.75, 2.0))
+
+df_graph %>% mutate(gene = factor(gene, levels = orderS)) %>% 
+  ggplot(aes(x=gene,y=Norm)) +
+  geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
+  geom_boxplot(alpha=0.8, outliers = F,fill="#820000", color="black") +
+  stat_compare_means(label = "p.signif", method = "t.test",
+                      ref.group = "Ctrl", hide.ns=T,label.y = 1.7)+
+  # gghighlight(shRNA %in% c("TARDBP","Ctrl"),
+  #             unhighlighted_params = list(color="#656565",fill="gray"),
+  #             use_group_by = F)+
+  theme_classic()+
+  theme(text = element_text(color="black", family = "Helvetica", size=15),
+        axis.text.x = element_text(angle = 45, hjust=1),
+        plot.margin = margin(t=1,unit = "cm"))+
+  xlab("")+ylab("% +PI Nuclei (weighted & normalized)")+
+  scale_y_continuous(expand=c(0,0), limits=c(-0.5,2),breaks = c(-0.25,0, .25, .50, .75, 1.00, 1.25, 1.50,1.75))
+ 
+# Calculate p-values of difference from control
+df_stats <- compare_means(formula= Norm ~ shRNA, data=df_graph, ref.group = "Ctrl_shCTR", method = "wilcox.test")
+df_Calc <- df_graph %>% group_by(shRNA) %>% summarize(med= round(median(Norm),5))  
+
+df_stats <-left_join(df_stats,df_Calc, join_by("group2" == "shRNA"))
+
+df_stats %>% mutate(p.adj = ifelse(p.adj <= 10^-8,10^-8,p.adj), label=str_split_i(group2,"_",1)) %>%
+  ggplot(aes(x=med,y=-log10(p.adj),label=label)) +
+  geom_point(size=2, color="#820000")+
+  gghighlight(p.adj < 0.0001,
+              unhighlighted_params = list(color="#656565",fill="gray", size=2))+
+  theme_classic()+
+  geom_text_repel(min.segment.length = 0.5,  box.padding = 0.5, fill=NA,label.size = NA,max.overlaps = Inf)+
+  theme(text = element_text(color="black", family = "Helvetica", size=25),
+        axis.text.x = element_text(angle = 45, hjust=1),
+        plot.margin = margin(t=1,unit = "cm"))+
+  ylab("")+xlab("% +PI Nuclei (normalized)")+
+  scale_x_continuous(expand=c(0,0), limits=c(-0.3,1.6),breaks = c(-0.5,0, .50, 1.00, 1.50))
+  
+
+
+```
