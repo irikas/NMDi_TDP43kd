@@ -145,6 +145,7 @@ for(i in 1:nrow(cryptic_df)){
 
 # Graph CE-adjusted log2FC and -log10p.adj
 # CEs with (lfc) < -1 and p.adj < 10^-20 named on plot
+#saveRDS(resLFC_adj,"data/resLFC_adj.RDS")
 resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
