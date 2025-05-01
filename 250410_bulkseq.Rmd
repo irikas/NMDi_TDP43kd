@@ -39,8 +39,12 @@ rm(CRANpackages,biocPackages)
 
 ```
 
+## DEG analysis
+Nextflow RNA-seq pipeline used to generate DESeq2 objects.
+Used DESeq2 vignette to write analysis script: https://www.bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
+
 ```{r DESeq2}
-# Data
+# Load data
 load("data/nmdi_all_deseq2.dds.RData")
 cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
 
@@ -59,17 +63,11 @@ design(dds) <- ~ tdp + NMDi + seqDate
 # Pre-filtering
 dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
 
-# all_counts <- as.data.frame(dds@assays@data@listData$counts) %>% rownames_to_column("gene") %>% 
-#   pivot_longer(cols=c(2:23), names_to = "condition", values_to = "count") %>%
-#   mutate(condition = str_split_i(condition,"_", 1))
-# 
-# all_counts %>% filter(gene %in% cryptic_df$`Ensembl ID`, str_detect(condition, "T|SgC"))%>% 
-#   ggplot(aes(x=condition,y=log10(count)))+
-#   #geom_jitter(width = 0.2)+
-#   geom_violin(draw_quantiles = c(0.5), scale="width") +theme_classic()
 
-
-# Analysis
+# DESeq2 Analysis: Subset to WT and TDP-43 KD without NMDi
+# Add experiment design
+# Log fold change shrinkage for visualization and ranking: "apeglm is the adaptive t prior shrinkage estimator from the apeglm package (Zhu, Ibrahim, and Love 2018). As of version 1.28.0, it is the default estimator."
+# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
 dds_noNMDi <- dds[,11:14]
 dds_noNMDi$tdp <- factor(dds_noNMDi$tdp, levels = c("WT","KD"))
 design(dds_noNMDi) <- ~ tdp
@@ -80,46 +78,26 @@ resLFC <- data.frame(resLFC) %>% filter(!is.na(log2FoldChange)) %>%
   mutate(neglog10p = -log10(padj), 
          geneType=NA, geneName=NA, TDPCE=NA, log2FoldChange_adj=log2FoldChange)
 
-# name fill column
+# Use cryptic_df to map CE details to results
 for(i in 1:nrow(cryptic_df)){
   n = which(rownames(resLFC) == cryptic_df$`Ensembl ID`[i])
   resLFC$geneType[n] = cryptic_df$Type[i]
   resLFC$geneName[n] = cryptic_df$`Gene Symbol`[i]
-  resLFC$TDPCE[n] = 1-(cryptic_df$avgT[i])/100
+  resLFC$TDPCE[n] = 1-(cryptic_df$maxTDP[i]- cryptic_df$avgT[i])/100
   
-  # Adjust for CE inclusion - show effective downregulation due to CE inclusion
-  resLFC$log2FoldChange_adj[n] = resLFC$log2FoldChange[n] + log2(resLFC$TDPCE[n])
+  # ADJ
+  resLFC$log2FoldChange_adj[n] = resLFC$log2FoldChange[n] - log2((resLFC$TDPCE[n]+0.0001))
   
   rm(i)
 }
 
+# Plot log2FC vs -log10Padj with CEs with abs(lfc) > 1 and p.adj < 10^-20 named on plot
 resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 2,geneName,"")) %>%
+                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,geneName,"")) %>%
   ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
-  geom_point(alpha=0.8,size=3) + theme_classic() + 
-  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
-  geom_label_repel(aes(label = geneName), 
-                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
-                   fill = alpha(c("white"),0.8), label.size = NA, force=10,
-                   min.segment.length = 0)+
-  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
-  theme(text = element_text(family="Helvetica"))+
-  ylim(0,60)
-ggsave("output_fig/250413_Ctrl_TDPkd_GEx.png",device = "png", 
-       width = 50, height = 30, units = "cm",limitsize = FALSE)
-
-# Adjusted LFC value but not p-value graph
-resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
-                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
-                  log2FoldChange_adj = ifelse(is.infinite(log2FoldChange_adj), 
-                                              log2FoldChange, log2FoldChange_adj),
-                  log2FoldChange_adj = ifelse(log2FoldChange_adj < -5,-5, 
-                                          ifelse(log2FoldChange_adj > 5, 5, log2FoldChange_adj)),
-                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange_adj) > 1,geneName,"")) %>%
-  ggplot(aes(x=log2FoldChange_adj,y=neglog10p, color=factor(geneType)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
   geom_label_repel(aes(label = geneName), 
@@ -128,23 +106,26 @@ resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
   scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60)
-ggsave("output_fig/250429_Ctrl_TDPkd_GEx_adj.png",device = "png", 
+ggsave("output_fig/250413_Ctrl_TDPkd_GEx.png",device = "png", 
        width = 50, height = 30, units = "cm",limitsize = FALSE)
 
-## Create new dds object
+## Create new dds object for CE-adjusted p-vales
+# First extract the raw counts
 raw_counts <- data.frame(dds_noNMDi@assays@data@listData$counts)
 
+# For each gene with a cryptic exon, change the TDPKD value to reflect effective downregulation of the gene due to CE inclusion
+# Multiply raw_count value by (1-CE_PSI)
 for(i in 1:nrow(cryptic_df)){
   n = which(rownames(raw_counts) == cryptic_df$`Ensembl ID`[i])
-  TDPCE = (100-cryptic_df$avgT[i])/100
+  tonly = ifelse(!is.na(cryptic_df$avgT[i]),cryptic_df$avgT[i],0)
+  TDPCE = 1-(cryptic_df$maxTDP[i]- tonly)/100
+  raw_counts$TDPKD_1[n] = as.integer(round((raw_counts$TDPKD_1[n])*TDPCE,0))
+  raw_counts$TDPKD_2[n] = as.integer(round((raw_counts$TDPKD_2[n])*TDPCE,0))
   
-  if(!is.na(TDPCE)){
-    raw_counts$TDPKD_1[n] = as.integer(round((raw_counts$TDPKD_1[n])*TDPCE,0))
-    raw_counts$TDPKD_2[n] = as.integer(round((raw_counts$TDPKD_2[n])*TDPCE,0)) 
-  }
   rm(i, n, TDPCE)
 }
 
+# Create DESeq2 object and do analysis as before
 dds_noNMDi_adj <- DESeqDataSetFromMatrix(countData = as.matrix(raw_counts),
                               colData = dds_noNMDi@colData,
                               design = ~ tdp)
@@ -162,23 +143,23 @@ for(i in 1:nrow(cryptic_df)){
   rm(i)
 }
 
-# saveRDS(resLFC_adj, "data/resLFC_adj.RDS")
-
+# Graph CE-adjusted log2FC and -log10p.adj
+# CEs with (lfc) < -1 and p.adj < 10^-20 named on plot
 resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & log2FoldChange < -2,geneName,"")) %>%
+                  geneName = ifelse(neglog10p>20 & log2FoldChange < -1,geneName,"")) %>%
   ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
   geom_label_repel(aes(label = geneName), 
                    box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
-                   fill = alpha(c("white"),0.8), label.size = NA, size=3,force=20)+
+                   fill = alpha(c("white"),0.8), label.size = NA)+
   scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60)
-ggsave("output_fig/250429_Ctrl_TDPkd_GEx_adj_rawcounts.png",device = "png", 
+ggsave("output_fig/250430_Ctrl_TDPkd_GEx_adj.png",device = "png", 
        width = 50, height = 30, units = "cm",limitsize = FALSE)
 
 
