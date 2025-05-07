@@ -17,7 +17,7 @@ The purpose of this script is to determine the location of UG repeats near crypt
 
 ```{r packages}
 CRANpackages <- c("tidyverse", "XML","ggplot2", "ggpubr", "ggstats","BiocManager","viridis", "gghighlight")
-biocPackages <- c("Biostrings")
+biocPackages <- c("Biostrings","biomaRt")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -54,6 +54,8 @@ As per text:
 
 Repeat frequencies for UG repeats (TDP-43) and CU repeats (PTBP1/PTBP2) were derived in a similar fashion."
 
+Default is for motif = "TG"
+
 
 ```{r functions}
 
@@ -62,7 +64,8 @@ dinucRepeatBinary <- function(testseq, motif="TG"){
 if(is.na(testseq)){
   return(NA)
 }
-  
+
+testseq <- toupper(testseq)
 pattern1 = motif
 pattern2 = Biostrings::reverse(motif)
 
@@ -143,9 +146,11 @@ return(str_flatten(testseq_num))
 ```
 
 ```{r seq, eval=F}
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 cryptic_df_coord <- cryptic_df[,c(1:4,6,18,19)] %>% mutate(leftRegion = NA,
                                                          rightRegion = NA)
+
+# Determine 
 
 for(i in 1:nrow(cryptic_df_coord)){
   if(!is.na(cryptic_df_coord$LeftJunction[i])){
@@ -192,7 +197,7 @@ cryptic_df_coord$urlR[which(is.na(cryptic_df_coord$RightJunction))] = NA
 ## Download seq from UCSC
 
 BASH ISN'T WORKING
-```{bash seq, eval=F}
+```{bash seqbash, eval=F}
 cd output_tables
 > 250411_cryptic_df_coord_left_fill.txt
 > 250411_cryptic_df_coord_right_fill.txt
@@ -230,18 +235,66 @@ for(i in 1:nrow(cryptic_df_coord)){
   rm(j,i,xmlF,seq)
 }
 
-# write.csv(cryptic_df_coord,"output_tables/cryptic_df_coord_seqFill.csv")
+# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_seqFill.csv")
 
+```
+
+## Determine correct strand
+```{r strand}
+cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_seqFill.csv")[-1]
+
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+biomart_CE <- getBM(attributes=c("external_gene_name",'ensembl_gene_id','strand'),
+                    filters = 'ensembl_gene_id', values = cryptic_df_coord$`Ensembl ID`, mart = ensembl)
+
+cryptic_df_coord <- cryptic_df_coord %>% left_join(biomart_CE,join_by(`Ensembl ID` == "ensembl_gene_id"))
+
+#Find blanks - none
+which(!(cryptic_df_coord$strand %in% c(-1,1)))
+
+# change sequences as needed
+
+for(i in 1:nrow(cryptic_df_coord)){
+  if(cryptic_df_coord$strand[i] == -1){
+    if(!is.na(cryptic_df_coord$seqL[i])){
+      seq <- DNAString(cryptic_df_coord$seqL[i])
+      seq <- reverseComplement(seq)
+      cryptic_df_coord$seqL[i] = as.character(unlist(seq))
+      
+      rm(seq)
+    }
+    
+    if(!is.na(cryptic_df_coord$seqR[i])){
+      seq <- DNAString(cryptic_df_coord$seqR[i])
+      seq <- reverseComplement(seq)
+      cryptic_df_coord$seqR[i] = as.character(unlist(seq))
+      
+      rm(seq)
+    }
+    seqLtoR = cryptic_df_coord$seqL[i]
+    seqRtoL = cryptic_df_coord$seqR[i]
+    
+    cryptic_df_coord$seqL[i] = seqRtoL
+    cryptic_df_coord$seqR[i] = seqLtoR
+  }
+  rm(i)
+}
+
+
+# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_seq_strand.csv")
 ```
 
 ## Use UGrepeat function
 ```{r UGrepeatSeq}
+cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_seq_strand.csv")[-1]
+
 cryptic_df_coord <- cryptic_df_coord %>% mutate(seqRepL_UG = NA, seqRepR_UG = NA)
 
 cryptic_df_coord$seqRepL_UG <- unlist(lapply(toupper(cryptic_df_coord$seqL),dinucRepeatBinary))
 cryptic_df_coord$seqRepR_UG <- unlist(lapply(toupper(cryptic_df_coord$seqR),dinucRepeatBinary))
 
-# write.csv(cryptic_df_coord,"output_tables/250412_cryptic_df_coord_UGrepcalc.csv")
+# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_UGrepcalc.csv")
+cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_UGrepcalc.csv")[-1]
 
 mathUG_df_L <- data.frame("loc" = -600:50)
 mathUG_df_R <- data.frame("loc" = -50:600)
@@ -262,14 +315,13 @@ for(i in 1:nrow(cryptic_df_coord)){
 mathUG_df_L$avg = apply(mathUG_df_L[,2:ncol(mathUG_df_L)],MARGIN=1,function(x) round(mean(x),3))
 mathUG_df_R$avg = apply(mathUG_df_R[,2:ncol(mathUG_df_R)],MARGIN=1,function(x) round(mean(x),3))
 
-# write.csv(mathUG_df_L, "output_tables/250412_cryptic_df_UG_freq_L.csv")
-# write.csv(mathUG_df_R, "output_tables/250412_cryptic_df_UG_freq_R.csv")
+# write.csv(mathUG_df_L, "output_tables/250506_cryptic_df_UG_freq_L.csv")
+# write.csv(mathUG_df_R, "output_tables/250506_cryptic_df_UG_freq_R.csv")
 
-
-
-ggplot(mathUG_df_R, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
+ggplot(mathUG_df_R, aes(x=loc,y=avg))+
+  geom_line(linewidth = 2,colour = "#69140E")+
   theme_classic()+
-  scale_y_continuous(expand = c(0, 0),limits = c(0,0.5))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
   scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
   theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
         axis.ticks.y = element_blank(),
@@ -277,7 +329,61 @@ ggplot(mathUG_df_R, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E"
 
 ggplot(mathUG_df_L, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
   theme_classic()+
-  scale_y_continuous(expand = c(0, 0),limits = c(0,0.5))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+
+
+```
+
+## Check CA repeat
+```{r CArepeatSeq}
+cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_UGrepcalc.csv")[-1]
+
+cryptic_df_coord <- cryptic_df_coord %>% mutate(seqRepL_CA = NA, seqRepR_CA = NA)
+
+cryptic_df_coord$seqRepL_CA <- unlist(lapply(cryptic_df_coord$seqL, function(x) dinucRepeatBinary(x, motif="CA")))
+cryptic_df_coord$seqRepR_CA <- unlist(lapply(cryptic_df_coord$seqR, function(x) dinucRepeatBinary(x, motif="CA")))
+
+# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_CArepcalc.csv")
+cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_CArepcalc.csv")[-1]
+
+mathCA_df_L <- data.frame("loc" = -600:50)
+mathCA_df_R <- data.frame("loc" = -50:600)
+
+for(i in 1:nrow(cryptic_df_coord)){
+  if(!is.na(cryptic_df_coord$seqRepL_CA[i])){
+    mathCA_df_L <- cbind(mathCA_df_L, as.numeric(unlist(str_split(cryptic_df_coord$seqRepL_CA[i],""))))
+    colnames(mathCA_df_L)[ncol(mathCA_df_L)] = cryptic_df_coord$`ID #`[i]
+  } 
+  
+  if(!is.na(cryptic_df_coord$seqRepR_CA[i])){
+    mathCA_df_R <- cbind(mathCA_df_R, as.numeric(unlist(str_split(cryptic_df_coord$seqRepR_CA[i],""))))
+    colnames(mathCA_df_R)[ncol(mathCA_df_R)] = cryptic_df_coord$`ID #`[i]
+  } 
+  rm(i)
+}
+
+mathCA_df_L$avg = apply(mathCA_df_L[,2:ncol(mathCA_df_L)],MARGIN=1,function(x) round(mean(x),3))
+mathCA_df_R$avg = apply(mathCA_df_R[,2:ncol(mathCA_df_R)],MARGIN=1,function(x) round(mean(x),3))
+
+# write.csv(mathCA_df_L, "output_tables/250506_cryptic_df_CA_freq_L.csv")
+# write.csv(mathCA_df_R, "output_tables/250506_cryptic_df_CA_freq_R.csv")
+
+ggplot(mathCA_df_R, aes(x=loc,y=avg))+
+  geom_line(linewidth = 2,colour = "#69140E")+
+  theme_classic()+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+
+ggplot(mathCA_df_L, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
+  theme_classic()+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
   scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
   theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
         axis.ticks.y = element_blank(),
