@@ -47,7 +47,7 @@ rm(CRANpackages,biocPackages)
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
 
 ## Crypticdfs
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 cryptic_df_high <- read_delim("output_tables/250409_CrypticCoordinates_HighExp.csv")
 
 ## Data
@@ -157,7 +157,7 @@ keggResAnalysis %>%
   scale_fill_manual(values = c("#D1D1D1","#262626"))+
   scale_x_continuous(expand = c(0, 0),limits = c(0,12))+
   theme(text = element_text(color="black", family="Helvetica", size =10))
-ggsave("output_fig/250410_ALS_CE_genePathways.png",device = "png", 
+ggsave("output_fig/250506_ALS_CE_genePathways.png",device = "png", 
        width = 40, height = 25, units = "cm",limitsize = FALSE)
 
 ```
