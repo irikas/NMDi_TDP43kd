@@ -32,7 +32,7 @@ for(i in CRANpackages){
 
 ## Merge sj files together
 
-```{r mergeSJ}
+```{r mergeSJ, eval=FALSE}
 ### Load cryptic files
 cryptic_df <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/data/250502_CE_Coordinates.csv")[1:21]
 
@@ -87,7 +87,7 @@ write.csv(finaldf,"output_tables/250325_SpliceJunctions_Cleaned.csv",row.names =
 write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"output_tables/250506_TestJunctions.csv")
 ```
 
-```{r calcPSI}
+```{r calcPSI, eval=FALSE}
 junctionCountdf <- read_delim("output_tables/250325_SpliceJunctions_Cleaned.csv")
 
 uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
@@ -236,7 +236,7 @@ cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 pieChartFx(cryptic_df$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
 ggsave("output_fig/250329_CE_All.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$Type)
+table(cryptic_df$type)
 
 pieChartFx(cryptic_df$`Inf. Ins.`, naValue = T)
 ggsave("output_fig/250329_Pie_InFrame_CE.png",device = "png", 
