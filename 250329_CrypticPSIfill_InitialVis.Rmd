@@ -33,12 +33,11 @@ for(i in CRANpackages){
 ## Merge sj files together
 
 ```{r mergeSJ}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
 ### Load cryptic files
-cryptic_df <- read_delim("250325_CrypticCoordinates.csv")[1:19]
+cryptic_df <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/data/250502_CE_Coordinates.csv")[1:21]
 
 # Clean up junctions
-for(i in c(5:6,17:18)){
+for(i in c(5:6,20:21)){
   cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = ",", replacement = "", x = x))
   cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = " ", replacement = "", x = x))
   rm(i)
@@ -51,9 +50,11 @@ uniqueJunctions = unlist(as.list(str_split(uniqueJunctions,";")))
 finaldf <- data.frame()
 
 ### Load .sj files
-for(i in list.files("SJfiles/")){
+sj_wd <- "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/SJfiles/"
+
+for(i in list.files(sj_wd)){
   condName = gsub(pattern=".sj",replacement="",x = i)
-  tempdf <- read_delim(paste0("SJfiles/",i),col_names =F,lazy = T) %>% mutate(Condition = condName,
+  tempdf <- read_delim(paste0(sj_wd,i),col_names =F,lazy = T) %>% mutate(Condition = condName,
                                                                      Coordinates = paste0(X1,":",X2,"-",X3)) %>%
     filter(Coordinates %in% uniqueJunctions)
   finaldf <- rbind(finaldf,tempdf,col_names = F)
@@ -82,23 +83,21 @@ finaldf <- finaldf %>% filter(Condition != "FALSE") %>%
               values_fn = function(x) mean(x, na.rm=T), 
               id_cols = "Coordinates")
 
-write.csv(finaldf,"250325_SpliceJunctions_Cleaned.csv",row.names = F)
-write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"250325_TestJunctions.csv")
+write.csv(finaldf,"output_tables/250325_SpliceJunctions_Cleaned.csv",row.names = F)
+write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"output_tables/250506_TestJunctions.csv")
 ```
 
 ```{r calcPSI}
-
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
-junctionCountdf <- read_delim("250325_SpliceJunctions_Cleaned.csv")
+junctionCountdf <- read_delim("output_tables/250325_SpliceJunctions_Cleaned.csv")
 
 uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
                          cryptic_df$LeftJunction, cryptic_df$RightJunction))
 uniqueJunctions = unlist(as.list(str_split(cryptic_df$LeftJunction,";")))
 
 cryptic_df_fill = cryptic_df
-cryptic_df_fill[,20:41] = NA
-colnames(cryptic_df_fill)[20:30] = paste0("LPSI_",colnames(junctionCountdf)[2:12])
-colnames(cryptic_df_fill)[31:41] = paste0("RPSI_",colnames(junctionCountdf)[2:12])
+cryptic_df_fill[,22:43] = NA
+colnames(cryptic_df_fill)[22:32] = paste0("LPSI_",colnames(junctionCountdf)[2:12])
+colnames(cryptic_df_fill)[33:43] = paste0("RPSI_",colnames(junctionCountdf)[2:12])
 
 for(i in 1:nrow(cryptic_df_fill)){
   ### LPSI 
@@ -117,7 +116,7 @@ for(i in 1:nrow(cryptic_df_fill)){
     
     # Calculate PSI
     psiCount = round((incdf/(excdf+incdf))*100,1)
-    cryptic_df_fill[i,20:30] = t(as.matrix(psiCount))
+    cryptic_df_fill[i,22:32] = t(as.matrix(psiCount))
   }
   
   ### RPSI 
@@ -136,26 +135,26 @@ for(i in 1:nrow(cryptic_df_fill)){
     
     # Calculate PSI
     psiCount = round((incdf/(excdf+incdf))*100,1)
-    cryptic_df_fill[i,31:41] = t(as.matrix(psiCount))
+    cryptic_df_fill[i,33:43] = t(as.matrix(psiCount))
   } 
 }
 
 cryptic_df_fill <- cryptic_df_fill %>% arrange(`Gene Symbol`)
-write.csv(cryptic_df_fill,"output_tables/250329_CrypticCoordinates.csv", row.names = F)
+cryptic_df_fill$`ID #` <- paste0("CE", sprintf("%03d", 1:423))
+# write.csv(cryptic_df_fill,"output_tables/250506_CrypticCoordinates.csv", row.names = F)
 
 ```
 
 ```{r SummaryColumns}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/")
-cryptic_df <- read_delim("250329_CrypticCoordinates.csv")
+cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates.csv")
 
-for(i in 20:41){
+for(i in 22:43){
   cryptic_df[which(cryptic_df[,i] == "NaN"),i] = NA
   rm(i)
 }
 
 # Add control avg
-cond = unique(str_split_i(colnames(cryptic_df)[20:41],"_",2))
+cond = unique(str_split_i(colnames(cryptic_df)[22:43],"_",2))
 cryptic_df$avgCtrl = round(apply(cryptic_df %>% dplyr::select(LPSI_C,RPSI_C,LPSI_SgC,RPSI_SgC), 1, 
                                     function(x) mean(x, na.rm=T)),1)
 
@@ -175,7 +174,19 @@ cryptic_df$maxCtrl = apply(cryptic_df %>% dplyr::select(contains("avgC")),1,func
 cryptic_df$maxTDP = apply(cryptic_df %>% dplyr::select(contains("avgT")),1,function(x) max(x, na.rm=T))
 cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
 
-write.csv(cryptic_df,"250329_CrypticCoordinates_Fill.csv", row.names = F)
+# Modify Type
+cryptic_df <- cryptic_df %>% mutate(cassette = 
+                                      ifelse((is.na(`Start Site`) & is.na(PolyA) & is.na(`Exon Ext.`)), 
+                                             "Y", NA)) %>% 
+  pivot_longer(cols = c("Start Site", "PolyA", "Exon Ext.", "cassette"), 
+               values_to = "val",values_drop_na = T, names_to = "type",names_transform = tolower) %>%
+  relocate(type, .after = `Splice Site (L/R)`)
+
+check <- cryptic_df[,c(1:19,42:55)]
+# rm CDH24, MZF1-AS1, GOLT1B, PABPC4, CDC42BPA
+cryptic_df <- cryptic_df %>% filter(!(`Gene Symbol` %in% c("CDH24", "MZF1-AS1", "GOLT1B", "PABPC4", "CDC42BPA")))
+
+# write.csv(cryptic_df,"output_tables/250506_CrypticCoordinates_Fill.csv", row.names = F)
 ```
 
 # Visualization
@@ -220,17 +231,9 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 
 ```{r VisPieChart}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Fill.csv")
-cryptic_df <- cryptic_df %>% mutate(Cassette = ifelse(is.na(`Start Site`) & 
-                                                        is.na(PolyA) &
-                                                        is.na(`Exon Ext.`),"Y",NA)) %>%
-  relocate(Cassette, .after = `Exon Ext.`) %>% 
-  pivot_longer(cols = c(12:15), names_to = "Type", values_to = "YN") %>% 
-  filter(!is.na(YN)) %>% dplyr::select(!YN) 
-# write.csv(cryptic_df,"250329_CrypticCoordinates_Vis.csv", row.names = F)
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 
-pieChartFx(cryptic_df$Type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
+pieChartFx(cryptic_df$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
 ggsave("output_fig/250329_CE_All.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 table(cryptic_df$Type)
@@ -251,7 +254,7 @@ ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png",
 table(cryptic_df$`Annotated Alternate Exon`)
 
 # NMD reveal
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
@@ -263,21 +266,23 @@ cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "
          category = ifelse(category == "TDPKDonly","TDPKDonly","NMDi"),
          NMDonly = factor(NMDonly, c("10pct","5pct","1pct"))) 
 
+table(cryptic_df$NMDonly, cryptic_df$category)
+
 cryptic_df %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
   theme_classic()+ xlab("") + ylab("# CEs") +
   theme(text = element_text(size = 14, family = "Helvetica"), 
         axis.ticks.x = element_blank(), 
         axis.title = element_text(size = 20, family = "Helvetica", color = "black")) +
-  scale_y_continuous(expand = c(0, 0),limits = c(0,400))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,500))+
   scale_fill_manual(values = c("#D1D1D1","#262626"))
-ggsave("output_fig/250409_NMDi_Effect_PctCutoffs.png",device = "png", 
+ggsave("output_fig/250506_NMDi_Effect_PctCutoffs.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 
 
 ### Plots to look at dPSI as a result of NMDi 
 ### Comparison to TDP-43 KD only
-cryptic_df_dNMD <- cryptic_df[,c(1:16,39:51)] %>% 
-  pivot_longer(17:26, names_to = "condition", names_prefix = "avg", values_to = "PSI")
+cryptic_df_dNMD <- cryptic_df[,c(1:19,42:54)] %>% 
+  pivot_longer(20:30, names_to = "condition", names_prefix = "avg", values_to = "PSI")
 cryptic_df_dNMD_avgT <- cryptic_df_dNMD %>% filter(condition == "T")
 cryptic_df_dNMD_avgNMD <- cryptic_df_dNMD %>% filter(condition != "T") %>% 
   mutate(facetCol = condition)
@@ -305,7 +310,7 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
   facet_wrap(~ facetCol, scales = "free_x", ncol = 4) 
-ggsave("output_fig/250329_NMDi_Effect_Paired.png",device = "png", 
+ggsave("output_fig/250506_NMDi_Effect_Paired.png",device = "png", 
        width = 50, height = 30, units = "cm",limitsize = FALSE)
 
 
@@ -326,7 +331,7 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
     stat_compare_means(label = "p.signif", method = "t.test", ref.group = "T")
-ggsave("output_fig/250329_NMDi_Effect_Stats.png",device = "png", 
+ggsave("output_fig/250506_NMDi_Effect_Stats.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 
 ### chr/mbp graph 
@@ -363,7 +368,7 @@ histcryptic %>%
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))
-ggsave("output_fig/250329_chrPmbp.png",device = "png", 
+ggsave("output_fig/250506_chrPmbp.png",device = "png", 
        width = 50, height = 25, units = "cm",limitsize = FALSE)
 ```
 
@@ -371,14 +376,14 @@ ggsave("output_fig/250329_chrPmbp.png",device = "png",
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
 
 ## High expressors
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
 write.csv(cryptic_df_high,"output_tables/250409_CrypticCoordinates_HighExp.csv")
 
 # Top 30 CEs
-cryptic_df_high <- cryptic_df_high[,c(1:16,39:61)] %>% 
+cryptic_df_high <- cryptic_df_high[,c(1:19,43:55)] %>% 
   arrange(desc(maxTDP)) %>% top_n(30,wt=maxTDP) %>%
-  pivot_longer(17:26, names_to = "condition", 
+  pivot_longer(22:28, names_to = "condition", 
                names_prefix = "avg", values_to = "PSI") %>%
   mutate(PSI = ifelse(is.na(PSI),0,PSI)) %>%
   mutate(condition = factor(condition, levels=rev(c("Ctrl", "CXS", "CX", "CUS", "CXU",
@@ -391,7 +396,7 @@ cryptic_df_high %>%
   theme(text = element_text(color="black", family="Helvetica", size =25),
         axis.text.x = element_text(angle = 30, hjust=1))+
   scale_fill_viridis_c(option = "F")
-ggsave("output_fig/250409_top20_highExp.png",device = "png", 
+ggsave("output_fig/250506_top20_highExp.png",device = "png", 
        width = 50, height = 25, units = "cm",limitsize = FALSE)
 
 # High expressor gene expression across tissues
@@ -406,7 +411,7 @@ nauc_highCE_mat <- nauc_highCE[-1] %>% pivot_wider(names_from="tissue", values_f
 
 pheatmap(nauc_highCE_mat, color = rocket(100),border_color = NA, 
          cluster_cols = F, treeheight_row = 0, treeheight_col = 0,
-         angle_col = "90", filename = "output_fig/250329_topExp_TissueExp.png",
+         angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
          width = 10, height =10)
 
 ```
