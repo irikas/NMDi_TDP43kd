@@ -198,7 +198,7 @@ ggsave("output_fig/250506_shRNA_toxicity_pVal.png",device = "png",
 resLFC_adj <- readRDS("data/resLFC_adj.RDS")
 for(i in 1:nrow(cryptic_df)){
   n = which(rownames(resLFC_adj) == cryptic_df$`Ensembl ID`[i])
-  resLFC_adj$geneType[n] = cryptic_df$Type[i]
+  resLFC_adj$geneType[n] = cryptic_df$type[i]
   resLFC_adj$geneName[n] = cryptic_df$`Gene Symbol`[i]
   rm(i)
 }
