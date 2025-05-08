@@ -102,6 +102,7 @@ for(i in 1:nrow(df_meta)){
 
 ## Cell/Image Analysis
 ```{r QC}
+cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 df_meta$Metadata_plate <- as.character(df_meta$Metadata_plate)
 
 # There is significant plate to plate variation in the mean number of nuclei/well compared to the overall mean
@@ -167,8 +168,8 @@ df_graph %>% mutate(gene = factor(gene, levels = orderS)) %>%
   theme(text = element_text(color="black", family = "Helvetica", size=15),
         axis.text.x = element_text(angle = 45, hjust=1))+
   xlab("")+ylab("% +PI Nuclei (normalized)")+
-  scale_y_continuous(expand=c(0,0), limits=c(-0.6,2.1),breaks = c(-0.5, -0.25,0, .25, .50, .75, 1.00, 1.25, 1.50,1.75, 2.0))
-ggsave("output_fig/250430_shRNA_toxicity.png",device = "png", 
+  scale_y_continuous(expand=c(0,0), limits=c(-0.6,2.5),breaks = c(-0.5, 0, .50, 1.00, 1.50,2.0,2.5))
+ggsave("output_fig/250506_shRNA_toxicity.png",device = "png", 
        width = 50, height = 20, units = "cm",limitsize = FALSE)
  
 # Calculate p-values of difference from control using Wilcox test - not normalized
@@ -190,7 +191,7 @@ df_stats %>% mutate(p.adj = ifelse(p.adj <= 10^-10,10^-10,p.adj), label=str_spli
         plot.margin = margin(t=1,unit = "cm"))+
   ylab("-log10p")+xlab("% +PI Nuclei (normalized)")+
   scale_x_continuous(expand=c(0,0), limits=c(-0.3,1.6),breaks = c(-0.5,0, .50, 1.00, 1.50))
-ggsave("output_fig/250430_shRNA_toxicity_pVal.png",device = "png", 
+ggsave("output_fig/250506_shRNA_toxicity_pVal.png",device = "png", 
        width = 20, height = 20, units = "cm",limitsize = FALSE)
 
 # Visualize median toxicity vs. LFC
@@ -218,7 +219,7 @@ df_plot %>% mutate(padj = ifelse(padj < 10^-50, 10^-50, padj),
         plot.margin = margin(t=1,unit = "cm"))+
   xlab("log2fc")+ylab("-log10p of toxicity")
 
-ggsave("output_fig/250430_shRNA_toxicity_pVal_vs_log2FC.png",device = "png", 
+ggsave("output_fig/250506_shRNA_toxicity_pVal_vs_log2FC.png",device = "png", 
        width = 20, height = 20, units = "cm",limitsize = FALSE)
 
 
