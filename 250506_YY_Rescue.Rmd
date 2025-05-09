@@ -78,6 +78,7 @@ scores_df$Norm = round((scores_df$survival - minVal)/(maxVal-minVal),3)
 pal <- scales::gradient_n_pal(colours = c("#820000","white","#002D72"), values= c(0, 0.253,0.5))
 df_summary$fillColor <- pal(df_summary$med)
 df_summary$fillColor[which(df_summary$gene == "GFP")] = "#820000"
+order = df_summary$gene
 
 scores_df %>% mutate(gene = factor(gene, levels = order)) %>%
   filter(gene != "shCTR")%>%
