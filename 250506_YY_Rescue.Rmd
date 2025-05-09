@@ -1,0 +1,103 @@
+---
+title: "250506_YY_OE"
+author: "Irika Sinha"
+date: "2025-05-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the file output of CellProfiler and figure out which rescues worked
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2","gghighlight","ggpubr")
+
+# CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
+biocPackages <- c()
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+## Data
+```{r data}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+scores_df <- read_delim("data/240924_YY_rescue.csv")
+
+# Filter knockdown genes to those kept in final CE dictionary
+oddKD <- unique(scores_df$gene)[which(!(unique(scores_df$gene) %in% c(cryptic_df$`Gene Symbol`, "GFP","shCTR")))]
+scores_df <- scores_df %>%  filter(!(gene %in% c("TCF25")))
+
+```
+
+## Normalize scores to shCTR-GFP and shTDP43-GFP
+```{r norm}
+# Normalize survival
+# 0 = shTDP43-GFP
+# 1 = shCTR-GFP
+
+scores_df$survival = as.numeric(scores_df$survival)
+df_summary <- scores_df %>% group_by(gene) %>% summarize(med = median(survival)) %>% arrange(med)
+
+minVal = df_summary$med[which(df_summary$gene == "GFP")]
+maxVal = df_summary$med[which(df_summary$gene == "shCTR")]
+
+scores_df$Norm = round((scores_df$survival - minVal)/(maxVal-minVal),3)
+
+
+```
+
+
+
+## Visualize
+```{r visual}
+# generate colors
+pal <- scales::gradient_n_pal(colours = c("#820000","white","#002D72"), values= c(0, 0.253,0.5))
+df_summary$fillColor <- pal(df_summary$med)
+df_summary$fillColor[which(df_summary$gene == "GFP")] = "#820000"
+
+scores_df %>% mutate(gene = factor(gene, levels = order)) %>%
+  filter(gene != "shCTR")%>%
+  ggplot(aes(x=gene,y=Norm, fill = gene)) +
+  geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
+  geom_boxplot(alpha=0.7, outliers = F) + 
+  scale_fill_manual(values=df_summary$fillColor) +
+  theme_classic()+ scale_y_continuous(expand = c(0, 0),limits = c(-0.3,0.7))+
+  theme(text = element_text(color="black", family = "Helvetica", size=15),
+        axis.text.x = element_text(angle = 45, hjust=1), legend.position = "none")+
+  xlab("")+ylab("Survival")+
+  stat_compare_means(label = "p.signif", method = "wilcox.test", ref.group = "GFP")
+
+ggsave("output_fig/250506_shRNA_toxicity.png",device = "png", 
+       width = 50, height = 20, units = "cm",limitsize = FALSE)
+
+# Calculate p-values of difference from control using Wilcox test - not normalized
+df_stats <- compare_means(formula= Norm ~ gene, data=scores_df, ref.group = "GFP", method = "wilcox.test")
+
+
+```
+
+
