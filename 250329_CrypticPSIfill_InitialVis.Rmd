@@ -231,10 +231,10 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 
 ```{r VisPieChart}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
-cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("data/250509_CE_table.csv")
 
 pieChartFx(cryptic_df$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
-ggsave("output_fig/250329_CE_All.png",device = "png", 
+ggsave("output_fig/250509_CE_All.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 table(cryptic_df$type)
 
@@ -254,7 +254,7 @@ ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png",
 table(cryptic_df$`Annotated Alternate Exon`)
 
 # NMD reveal
-cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("data/250509_CE_table.csv")
 cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
@@ -277,7 +277,7 @@ cryptic_df %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
   scale_fill_manual(values = c("#D1D1D1","#262626"))
 ggsave("output_fig/250506_NMDi_Effect_PctCutoffs.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
-
+round(table(cryptic_df$NMDonly, cryptic_df$category)/417,3)
 
 ### Plots to look at dPSI as a result of NMDi 
 ### Comparison to TDP-43 KD only
@@ -296,9 +296,9 @@ for(i in cond){
 
 cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
   mutate(facetCol = factor(facetCol, levels=c("TXS","TX","TUS","TXU"))) %>%
-  ggplot(aes(x = condition, y = PSI)) +
+  ggplot(aes(x = condition, y = PSI, fill = condition)) +
   geom_line(aes(group=`ID #`), alpha = 0.07) +
-  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
+  geom_boxplot(alpha=1, outliers = T, fill = rep(c("#262626", "#D1D1D1"),4), color = "black",
                outlier.color = "#444444",outlier.size = 1) +
   theme_classic()+ xlab("") + ylab("Average R/L PSI") +
   theme(text = element_text(size = 14, family = "Helvetica"), 
@@ -330,7 +330,11 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
-    stat_compare_means(label = "p.signif", method = "t.test", ref.group = "T")
+    stat_compare_means(label = "p.signif", method = "wilcox.test", 
+                       comparisons = list(#c("T", "TXS"), c("T", "TX"), 
+                                          #c("T", "TUS"), c("T", "TXU"),
+                                          c("TXU", "TXS"), c("TXU", "TX"), 
+                                          c("TXU", "TUS")))
 ggsave("output_fig/250506_NMDi_Effect_Stats.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
 
@@ -378,7 +382,7 @@ setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/
 ## High expressors
 cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
 cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
-write.csv(cryptic_df_high,"output_tables/250409_CrypticCoordinates_HighExp.csv")
+write.csv(cryptic_df_high,"output_tables/250506_CrypticCoordinates_HighExp.csv")
 
 # Top 30 CEs
 cryptic_df_high <- cryptic_df_high[,c(1:19,43:55)] %>% 
