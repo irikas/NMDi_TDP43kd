@@ -1,0 +1,439 @@
+Key,Value
+CellProfiler_Version,4.2.8
+ChannelType_DAPI,Color
+ChannelType_PIstain,Color
+ChannelType_widefield,Grayscale
+ImageSet_Zip_Dictionary,b'PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48T01FIHhtbG5zPSJodHRwOi8vd3d3Lm9wZW5taWNyb3Njb3B5Lm9yZy9TY2hlbWFzL09NRS8yMDE2LTA2Ij48SW1hZ2UgSUQ9IkRBUEkiPjxQaXhlbHMgRGltZW5zaW9uT3JkZXI9IlhZQ1pUIiBJRD0iUGl4ZWxzOkRBUEkiIFNpemVDPSIxIiBTaXplVD0iMSIgU2l6ZVg9IjEiIFNpemVZPSIxIj48VGlmZkRhdGEgRmlyc3RDPSIwIiBGaXJzdFQ9IjAiIEZpcnN0Wj0iMCIgSUZEPSIwIiBQbGFuZUNvdW50PSIxIj48VVVJRCBGaWxlTmFtZT0iZmlsZTovVXNlcnMvaXJpa2EvTGlicmFyeS9DbG91ZFN0b3JhZ2UvT25lRHJpdmUtSm9obnNIb3BraW5zL1dvbmdMaW5nL1Byb2plY3RzL05NRC9JbWFnZXMvVERQNDNfc2hSTkFfcGxhdGUxL1REUDQzX3NoUk5BX3BsYXRlMV9zMDAxX0RBUEkucG5nIi8+PC9UaWZmRGF0YT48UGxhbmUgVGhlQz0iMCIgVGhlVD0iMCIgVGhlWj0iMCI+PEFubm90YXRpb25SZWYgSUQ9ImluZm86Ly9jZWxscHJvZmlsZXIub3JnL2ltYWdlc2V0L2Fubm90YXRpb24vMjAxNC0wNC0xNy9DaGFubmVsLy0yIi8+PC9QbGFuZT48L1BpeGVscz48L0ltYWdlPjxJbWFnZSBJRD0iUElzdGFpbiI+PFBpeGVscyBEaW1lbnNpb25PcmRlcj0iWFlDWlQiIElEPSJQaXhlbHM6UElzdGFpbiIgU2l6ZUM9IjEiIFNpemVUPSIxIiBTaXplWD0iMSIgU2l6ZVk9IjEiPjxUaWZmRGF0YSBGaXJzdEM9IjAiIEZpcnN0VD0iMCIgRmlyc3RaPSIwIiBJRkQ9IjAiIFBsYW5lQ291bnQ9IjEiPjxVVUlEIEZpbGVOYW1lPSJmaWxlOi9Vc2Vycy9pcmlrYS9MaWJyYXJ5L0Nsb3VkU3RvcmFnZS9PbmVEcml2ZS1Kb2huc0hvcGtpbnMvV29uZ0xpbmcvUHJvamVjdHMvTk1EL0ltYWdlcy9URFA0M19zaFJOQV9wbGF0ZTEvVERQNDNfc2hSTkFfcGxhdGVfczBfUEkucG5nIi8+PC9UaWZmRGF0YT48UGxhbmUgVGhlQz0iMCIgVGhlVD0iMCIgVGhlWj0iMCI+PEFubm90YXRpb25SZWYgSUQ9ImluZm86Ly9jZWxscHJvZmlsZXIub3JnL2ltYWdlc2V0L2Fubm90YXRpb24vMjAxNC0wNC0xNy9DaGFubmVsLy0yIi8+PC9QbGFuZT48L1BpeGVscz48L0ltYWdlPjxJbWFnZSBJRD0id2lkZWZpZWxkIj48UGl4ZWxzIERpbWVuc2lvbk9yZGVyPSJYWUNaVCIgSUQ9IlBpeGVsczp3aWRlZmllbGQiIFNpemVUPSIxIiBTaXplWD0iMSIgU2l6ZVk9IjEiPjxUaWZmRGF0YSBGaXJzdEM9IjAiIEZpcnN0VD0iMCIgRmlyc3RaPSIwIiBJRkQ9IjAiIFBsYW5lQ291bnQ9IjEiPjxVVUlEIEZpbGVOYW1lPSJmaWxlOi9Vc2Vycy9pcmlrYS9MaWJyYXJ5L0Nsb3VkU3RvcmFnZS9PbmVEcml2ZS1Kb2huc0hvcGtpbnMvV29uZ0xpbmcvUHJvamVjdHMvTk1EL0ltYWdlcy9URFA0M19zaFJOQV9wbGF0ZTEvVERQNDNfc2hSTkFfcGxhdGUxX3MwMDFfPjwvUHhzPjwvSW1hZ2V1cmVMb25nQW5ub3RhdGlvbmNyYW5uRGVzY3JpcHRpb24+VmFsdWU+PG9uZ3Rpb24+PFN0cnVjdHVyZWRBbm5vdGF0aW9ucz48L08iIFNpemVDPSIxIiBTaXplVD0iMSIgU2l6ZVg9IjEiIFNpemVZPSIxIj48VGlmZkRhdGEgRmlyc3RDPSIwIiBGaXJzdFQ9IjAiIEZpcnN0Wj0iMCIgSUZEPSIwIiBQbGFuZUNvdW50PSIxIj48VVVJRCBGaWxlTmFtZT0iZmlsZTovVXNlcnMvaXJpa2EvTGlicmFyeS9DbG91ZFN0b3JhZ2UvT25lRHJpdmUtSm9obnNIb3BraW5zL1dvbmdMaW5nL1Byb2plY3RzL05NRC9JbWFnZXMvVERQNDNfc2hSTkFfcGxhdGUyL1REUDQzX3NoUk5BX3BsYXRlMl9zMTM2Xy9URFA0M19zaFJOQV9wbGF0ZTIzIiBTaXplVD0iMSIgU2l6ZVg9IjEiIFNpemVZPSIxIj48VGlmZkRhdGEgRmlyc3RDPSIwIiBGaXJzdFQ9IjAiIEZpcnN0Wj0iMCIgSUZEPSIwIiBQbGFuZUNvdW50PSIxIj48VVVJRCBGaWxlTmFtZT0iZmlsZTovVXNlcnMvaXJpa2EvTGlicmFyeS9DbG91ZFN0b3JhZ2UvT25lRHJpdmUtSm9obnNIb3BraW5zL1dvbmdMaW5nL1Byb2plY3RzL05NRC9JbWFnZXMvVERQNDNfc2hSTkFfcGxhdGUyL1REUDQzX3NoUk5BX3BsYXRlMl9zMTM2XyIgU2l6ZUM9IjEiIFNpemVUPSIxIiBTaXplWD0iMSIgU2l6ZVk9IjEiPjxUaWZmRGF0YSBGaXJzdEM9IjAiIEZpcnN0VD0iMCIgRmlyc3RaPSIwIiBJRkQ9IjAiIFBsYW5lQ291bnQ9IjEiPjxVVUlEIEZpbGVOYW1lPSJmaWxlOi9Vc2Vycy9pcmlrYS9MaWJyYXJ5L0Nsb3VkU3RvcmFnZS9PbmVEcml2ZS1Kb2huc0hvcGtpbnMvV29uZ0xpbmcvUHJvamVjdHMvTk1EL0ltYWdlcy9URFA0M19zaFJOQV9wbGF0ZTUvVERQNDNfc2hSTkFfcGxhdGU1X3MwMTlfL1REUDQzX3NoUk5BX3BsYXRlNV9zIiBTaXplVD0iMSIgU2l6ZVg9IjEiIFNpemVZPSIxIj48VGlmZkRhdGEgRmlyc3RDPSIwIiBGaXJzdFQ9IjAiIEZpcnN0Wj0iMCIgSUZEPSIwIiBQbGFuZUNvdW50PSIxIj48VVVJRCBGaWxlTmFtZT0iZmlsZTovVXNlcnMvaXJpa2EvTGlicmFyeS9DbG91ZFN0b3JhZ2UvT25lRHJpdmUtSm9obnNIb3BraW5zL1dvbmdMaW5nL1Byb2plY3RzL05NRC9JbWFnZXMvVERQNDNfc2hSTkFfcGxhdGU1L1REUDQzX3NoUk5BX3BsYXRlNV9zMDE5X3htbHNpb24uMCJlbmNvRj9PTUVwOi93dy5vcHNjeS5vcmcvU20vT01FLTY+PEltYWdlIElEPSJEQVBJIj48UGl4ZWxzIERpbWVuc2lvbk9yZGVyPSJYWUNaVCIgSUQ9IlBpeGVsczpEQVBJIiBTaXplQz0iMSIgU2l6ZVQ9IjEiIFNpemVYPSIxIiBTaXplWT0iMSI+PFRpZmZEYXRhIEZpcnN0Qz0iMCIgRmlyc3RUPSIwIiBGaXJzdFo9IjAiIElGRD0iMCIgUGxhbmVDb3VudD0iMSI+PFVVSUQgRmlsZU5hbWU9ImZpbGU6L1VzZXJzL2lyaWthL0xpYnJhcnkvQ2xvdWRTdG9yYWdlL09uZURyaXZlLUpvaG5zSG9wa2lucy9Xb25nTGluZy9Qcm9qZWN0cy9OTUQvSW1hZ2VzL1REUDQzX3NoUk5BX3BsYXRlNy9URFA0M19zaFJOQV9wbGF0ZTdfczAxMF9BUEkucG5nIi8+PC9UaWZmRGF0YT48UGxhbmUgVGhlQz0iMCIgVGhlVD0iMCIgVGhlWj0iMCI+PEFubm90YXRpb25SZWYgSUQ9ImluZm86Ly9jZWxscHJvZmlsZXIub3JnL2ltYWdlc2V0L2Fubm90YXRpb24vMjAxNC0wNC0xNy9DaGFubmVsLy0yIi8+PC9QbGFuZT48L1BpeGVscz48L0ltYWdlPjxJbWFnZSBJRD0iUGluUElzdGFpbiIgU2l6ZUM9IjEiIFNpemVYPSIxIlk9IjEiPjxUaWZmRGF0YSBGaXJzdEM9IjAiIEZpcnN0VD0iMCIgWj0iMCJEPSJsYW49IjFVSUQgRmlOYW1lPSJmaWxlOnNlcnNpcmlrL0xpb3VTdG9yYXZlbnNMaW5nL2N0cy9NbWFnZXMvVERQNDNfc2hSTkFfcGxhdGU3L1RQaFJOX3MwMW5nPjxhdFBsYW5lIFRoZUM9IjAiIFRoZVQ9IjAiWj0iMCI+PEFubm90YXRpb25lZm86Ly9jcm9lci9pbWF0bm5vdGF0aW9uLzIwMTQtMDQ3L0NoYW5uZWwvLTIiLz48L2U+PC9QaXhlbHM+PC9JbWFnZT48SW1hZ2UgSWRlZmlkPjxQaXhlbHMgVCIgSXdpZGVmaWVsZCIgU2l6ZVQ9IjEiIFNpemVYPSIxIiBTaXplWT0iMSI+PFRpZmZEYXRhIEZpcnN0Qz0iMCIgRmlyc3RUPSIwIiBGaXJzdFo9IjAiIElGRD0iMCIgUGxhbmVDb3VudD0iMSI+PFVVSUQgRmlsZU5hbWU9ImZpbGU6L1VzZXJzL2lyaWthL0xpYnJhcnkvQ2xvdWRTdG9yYWdlL09uZURyaXZlLUpvaG5zSG9wa2lucy9Xb25nTGluZy9Qcm9qZWN0cy9OTUQvSW1hZ2VzL1REUDQzX3NoUk5BX3BsYXRlNy9URFA0M19zaFJOQV9wbGF0ZTdfczAxMF8='
+Metadata_Tags,"[""ImageNumber""]"
+Pipeline_Pipeline,"CellProfiler Pipeline: http://www.cellprofiler.org
+Version:5
+DateRevision:428
+GitHash:
+ModuleCount:23
+HasImagePlaneDetails:False
+
+Images:[module_num:1|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['To begin creating your project, use the Images module to compile a list of files and/or folders that you want to analyze. You can also specify a set of rules to include only the desired files in your selected folders.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    :
+    Filter images?:Images only
+    Select the rule criteria:and (extension does isimage) (file doesnot contain ""Coherence"")
+
+Metadata:[module_num:2|svn_version:'Unknown'|variable_revision_number:6|show_window:False|notes:['The Metadata module optionally allows you to extract information describing your images (i.e, metadata) which will be stored along with your measurements. This information can be contained in the file name and/or location, or in an external file.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Extract metadata?:Yes
+    Metadata data type:Text
+    Metadata types:{}
+    Extraction method count:1
+    Metadata extraction method:Extract from file/folder names
+    Metadata source:File name
+    Regular expression to extract from file name:^TDP43_shRNA_plate(?P<plate>[0-9])_s(?P<Well>[0-9][0-9][0-9])_(?P<channel>[\w]*).png
+    Regular expression to extract from folder name:(?P<Date>[0-9]{4}_[0-9]{2}_[0-9]{2})$
+    Extract metadata from:All images
+    Select the filtering criteria:and (file does contain """")
+    Metadata file location:Elsewhere...|
+    Match file and image metadata:[]
+    Use case insensitive matching?:No
+    Metadata file name:
+    Does cached metadata exist?:No
+
+NamesAndTypes:[module_num:3|svn_version:'Unknown'|variable_revision_number:8|show_window:False|notes:['The NamesAndTypes module allows you to assign a meaningful name to each image by which other modules will refer to it.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Assign a name to:Images matching rules
+    Select the image type:Grayscale image
+    Name to assign these images:DNA
+    Match metadata:[]
+    Image set matching method:Order
+    Set intensity range from:Image metadata
+    Assignments count:3
+    Single images count:0
+    Maximum intensity:255.0
+    Process as 3D?:No
+    Relative pixel spacing in X:1.0
+    Relative pixel spacing in Y:1.0
+    Relative pixel spacing in Z:1.0
+    Select the rule criteria:and (metadata does channel ""DAPI"")
+    Name to assign these images:DAPI
+    Name to assign these objects:Cell
+    Select the image type:Color image
+    Set intensity range from:Image bit-depth
+    Maximum intensity:255.0
+    Select the rule criteria:and (metadata does channel ""PI"")
+    Name to assign these images:PIstain
+    Name to assign these objects:Nucleus
+    Select the image type:Color image
+    Set intensity range from:Image bit-depth
+    Maximum intensity:255.0
+    Select the rule criteria:and (metadata does channel ""Coherence"")
+    Name to assign these images:widefield
+    Name to assign these objects:Cytoplasm
+    Select the image type:Grayscale image
+    Set intensity range from:Image metadata
+    Maximum intensity:255.0
+
+Groups:[module_num:4|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['The Groups module optionally allows you to split your list of images into image subsets (groups) which will be processed independently of each other. Examples of groupings include screening batches, microtiter plates, time-lapse movies, etc.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Do you want to group your images?:No
+    grouping metadata count:1
+    Metadata category:Well
+
+ColorToGray:[module_num:5|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:PIstain
+    Conversion method:Combine
+    Image type:RGB
+    Name the output image:PIstain_gray
+    Relative weight of the red channel:1.0
+    Relative weight of the green channel:0
+    Relative weight of the blue channel:0
+    Convert red to gray?:Yes
+    Name the output image:OrigRed
+    Convert green to gray?:Yes
+    Name the output image:OrigGreen
+    Convert blue to gray?:Yes
+    Name the output image:OrigBlue
+    Convert hue to gray?:Yes
+    Name the output image:OrigHue
+    Convert saturation to gray?:Yes
+    Name the output image:OrigSaturation
+    Convert value to gray?:Yes
+    Name the output image:OrigValue
+    Channel count:1
+    Channel number:1
+    Relative weight of the channel:1.0
+    Image name:Channel1
+
+RescaleIntensity:[module_num:6|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:PIstain_gray
+    Name the output image:PIstain_gray_bright
+    Rescaling method:Choose specific values to be reset to a custom range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.5,1.0
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+ImageMath:[module_num:7|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Operation:Log transform (base 2)
+    Raise the power of the result by:1.0
+    Multiply the result by:1
+    Add to result:-0.7
+    Set values less than 0 equal to 0?:Yes
+    Set values greater than 1 equal to 1?:Yes
+    Replace invalid values with 0?:Yes
+    Ignore the image masks?:Yes
+    Name the output image:pistain_subtract
+    Image or measurement?:Image
+    Select the first image:PIstain_gray_bright
+    Multiply the first image by:1
+    Measurement:
+    Image or measurement?:Image
+    Select the second image:PIstain_gray_bright
+    Multiply the second image by:1.0
+    Measurement:
+
+RescaleIntensity:[module_num:8|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:pistain_subtract
+    Name the output image:p_stain_processed
+    Rescaling method:Stretch each image to use the full intensity range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.0,0.5
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+ColorToGray:[module_num:9|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:DAPI
+    Conversion method:Combine
+    Image type:RGB
+    Name the output image:DAPI_gray
+    Relative weight of the red channel:0
+    Relative weight of the green channel:0
+    Relative weight of the blue channel:1.0
+    Convert red to gray?:Yes
+    Name the output image:OrigRed
+    Convert green to gray?:Yes
+    Name the output image:OrigGreen
+    Convert blue to gray?:Yes
+    Name the output image:OrigBlue
+    Convert hue to gray?:Yes
+    Name the output image:OrigHue
+    Convert saturation to gray?:Yes
+    Name the output image:OrigSaturation
+    Convert value to gray?:Yes
+    Name the output image:OrigValue
+    Channel count:1
+    Channel number:1
+    Relative weight of the channel:1.0
+    Image name:Channel1
+
+RescaleIntensity:[module_num:10|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:DAPI_gray
+    Name the output image:DAPI_gray_bright
+    Rescaling method:Stretch each image to use the full intensity range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.0,1.0
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+IdentifyPrimaryObjects:[module_num:11|svn_version:'Unknown'|variable_revision_number:15|show_window:False|notes:['Identify the nuclei from the nuclear stain image. ']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:DAPI_gray_bright
+    Name the primary objects to be identified:DAPI_gray_nuclei
+    Typical diameter of objects, in pixel units (Min,Max):20,90
+    Discard objects outside the diameter range?:Yes
+    Discard objects touching the border of the image?:No
+    Method to distinguish clumped objects:Intensity
+    Method to draw dividing lines between clumped objects:Intensity
+    Size of smoothing filter:10
+    Suppress local maxima that are closer than this minimum allowed distance:7.0
+    Speed up by using lower-resolution image to find local maxima?:Yes
+    Fill holes in identified objects?:After declumping only
+    Automatically calculate size of smoothing filter for declumping?:Yes
+    Automatically calculate minimum allowed distance between local maxima?:Yes
+    Handling of objects if excessive number of objects identified:Continue
+    Maximum number of objects:500
+    Use advanced settings?:Yes
+    Threshold setting version:12
+    Threshold strategy:Global
+    Thresholding method:Robust Background
+    Threshold smoothing scale:1.3488
+    Threshold correction factor:1.0
+    Lower and upper bounds on threshold:0.0,1.0
+    Manual threshold:0.0
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Three classes
+    Log transform before thresholding?:No
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+    Size of adaptive window:50
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Median
+    Variance method:Standard deviation
+    # of deviations:2.0
+    Thresholding method:Otsu
+
+EnhanceOrSuppressFeatures:[module_num:12|svn_version:'Unknown'|variable_revision_number:7|show_window:False|notes:['Use filtering to enhance the foci speckles in the image. The feature size setting should be specified to be at least as large as the largest feature to be enhanced.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:PIstain_gray_bright
+    Name the output image:PIstain_gray_bright_enhanced
+    Select the operation:Enhance
+    Feature size:40
+    Feature type:Speckles
+    Range of hole sizes:1,10
+    Smoothing scale:2.0
+    Shear angle:0.0
+    Decay:0.95
+    Enhancement method:Tubeness
+    Speed and accuracy:Fast
+    Rescale result image:Yes
+
+MaskImage:[module_num:13|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:['Mask the foci image using the nuclei objects.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:DAPI_gray_bright
+    Name the output image:DAPI_gray_nuclei_mask
+    Use objects or an image as a mask?:Objects
+    Select object for mask:DAPI_gray_nuclei
+    Select image for mask:None
+    Invert the mask?:No
+
+IdentifyPrimaryObjects:[module_num:14|svn_version:'Unknown'|variable_revision_number:15|show_window:False|notes:['Identify the foci using per-object thresholding to compute a threshold for each individual nuclei object. Some manual adjustment of the smoothing filter size and maxima supression distance is required to optimize segmentation.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:p_stain_processed
+    Name the primary objects to be identified:PIstain_gray_bright_objects
+    Typical diameter of objects, in pixel units (Min,Max):10,50
+    Discard objects outside the diameter range?:Yes
+    Discard objects touching the border of the image?:Yes
+    Method to distinguish clumped objects:Intensity
+    Method to draw dividing lines between clumped objects:Intensity
+    Size of smoothing filter:4
+    Suppress local maxima that are closer than this minimum allowed distance:4
+    Speed up by using lower-resolution image to find local maxima?:Yes
+    Fill holes in identified objects?:After both thresholding and declumping
+    Automatically calculate size of smoothing filter for declumping?:Yes
+    Automatically calculate minimum allowed distance between local maxima?:Yes
+    Handling of objects if excessive number of objects identified:Continue
+    Maximum number of objects:500
+    Use advanced settings?:Yes
+    Threshold setting version:12
+    Threshold strategy:Global
+    Thresholding method:Otsu
+    Threshold smoothing scale:1.3488
+    Threshold correction factor:1.0
+    Lower and upper bounds on threshold:0.0,1.0
+    Manual threshold:0.1
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Three classes
+    Log transform before thresholding?:No
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+    Size of adaptive window:50
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Mean
+    Variance method:Standard deviation
+    # of deviations:2
+    Thresholding method:Robust Background
+
+MeasureObjectIntensity:[module_num:15|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:['Measure intensity of nuclei in nuclei image']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select images to measure:DAPI_gray_bright
+    Select objects to measure:DAPI_gray_nuclei
+
+MeasureObjectIntensity:[module_num:16|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:['Measure the intensity of the π-staining against the nuclei']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select images to measure:DAPI_gray_nuclei_mask, PIstain_gray_bright
+    Select objects to measure:DAPI_gray_nuclei, PIstain_gray_bright_objects
+
+RelateObjects:[module_num:17|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:['Establish a parent-child between the foci (âx80x9cchildrenâx80x9d) and the nuclei (âx80x9cparentsâx80x9d) in order to determine which foci belong to which nuclei. Then, calculate mean foci measurements for each nucleus.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Parent objects:DAPI_gray_nuclei
+    Child objects:PIstain_gray_bright_objects
+    Calculate child-parent distances?:None
+    Calculate per-parent means for all child measurements?:Yes
+    Calculate distances to other parents?:No
+    Do you want to save the children with parents as a new object set?:No
+    Name the output object:None
+    Parent name:None
+    Parent name:None
+
+ExportToSpreadsheet:[module_num:18|svn_version:'Unknown'|variable_revision_number:13|show_window:False|notes:['Export any measurements to a comma-delimited file (.csv). The measurements made for the nuclei and foci objects will be saved to separate .csv files, in addition to the per-image .csv.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the column delimiter:Comma ("","")
+    Add image metadata columns to your object data file?:No
+    Add image file and folder names to your object data file?:No
+    Select the measurements to export:Yes
+    Calculate the per-image mean values for object measurements?:Yes
+    Calculate the per-image median values for object measurements?:Yes
+    Calculate the per-image standard deviation values for object measurements?:Yes
+    Output file location:Default Input Folder sub-folder|Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Images/250421_CellProfiler_1
+    Create a GenePattern GCT file?:No
+    Select source of sample row name:Metadata
+    Select the image to use as the identifier:None
+    Select the metadata to use as the identifier:None
+    Export all measurement types?:Yes
+    Press button to select measurements:Image|Count_DAPI_gray_nuclei,Image|Count_PIstain_gray_bright_objects,Image|Metadata_FileLocation,Image|Metadata_Well,Image|Metadata_channel,Image|Metadata_Frame,Image|Metadata_Series,Image|Metadata_plate,Image|Threshold_SumOfEntropies_PIstain_gray_bright_objects,Image|Threshold_SumOfEntropies_DAPI_gray_nuclei,Image|Threshold_WeightedVariance_PIstain_gray_bright_objects,Image|Threshold_WeightedVariance_DAPI_gray_nuclei,Image|Threshold_OrigThreshold_DAPI_gray_nuclei,Image|Threshold_OrigThreshold_PIstain_gray_bright_objects,Image|Threshold_FinalThreshold_DAPI_gray_nuclei,Image|Threshold_FinalThreshold_PIstain_gray_bright_objects,Image|Scaling_DAPI,Image|Scaling_PIstain,Image|Scaling_widefield,Image|Height_widefield,Image|Height_PIstain,Image|Height_DAPI,Image|FileName_DAPI,Image|FileName_widefield,Image|FileName_PIstain,Image|PathName_PIstain,Image|PathName_DAPI,Image|PathName_widefield,Image|MD5Digest_PIstain,Image|MD5Digest_widefield,Image|MD5Digest_DAPI,Image|Series_DAPI,Image|Series_widefield,Image|Series_PIstain,Image|ModuleError_17RelateObjects,Image|ModuleError_12EnhanceOrSuppressFeatures,Image|ModuleError_02Metadata,Image|ModuleError_16MeasureObjectIntensity,Image|ModuleError_05ColorToGray,Image|ModuleError_15MeasureObjectIntensity,Image|ModuleError_08RescaleIntensity,Image|ModuleError_11IdentifyPrimaryObjects,Image|ModuleError_09ColorToGray,Image|ModuleError_13MaskImage,Image|ModuleError_10RescaleIntensity,Image|ModuleError_04Groups,Image|ModuleError_01Images,Image|ModuleError_03NamesAndTypes,Image|ModuleError_14IdentifyPrimaryObjects,Image|ModuleError_06RescaleIntensity,Image|ModuleError_07ImageMath,Image|ExecutionTime_07ImageMath,Image|ExecutionTime_08RescaleIntensity,Image|ExecutionTime_17RelateObjects,Image|ExecutionTime_05ColorToGray,Image|ExecutionTime_12EnhanceOrSuppressFeatures,Image|ExecutionTime_04Groups,Image|ExecutionTime_14IdentifyPrimaryObjects,Image|ExecutionTime_11IdentifyPrimaryObjects,Image|ExecutionTime_03NamesAndTypes,Image|ExecutionTime_15MeasureObjectIntensity,Image|ExecutionTime_06RescaleIntensity,Image|ExecutionTime_13MaskImage,Image|ExecutionTime_10RescaleIntensity,Image|ExecutionTime_01Images,Image|ExecutionTime_16MeasureObjectIntensity,Image|ExecutionTime_02Metadata,Image|ExecutionTime_09ColorToGray,Image|Frame_PIstain,Image|Frame_widefield,Image|Frame_DAPI,Image|Width_PIstain,Image|Width_widefield,Image|Width_DAPI,Image|Group_Index,Image|Group_Number,Image|Group_Length,Image|URL_widefield,Image|URL_PIstain,Image|URL_DAPI,PIstain_gray_bright_objects|Intensity_MeanIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MeanIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_StdIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_StdIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MinIntensityEdge_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MinIntensityEdge_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MassDisplacement_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MassDisplacement_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MeanIntensityEdge_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MeanIntensityEdge_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MaxIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MaxIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MedianIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MedianIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_StdIntensityEdge_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_StdIntensityEdge_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_LowerQuartileIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_LowerQuartileIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MinIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MinIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MaxIntensityEdge_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_MaxIntensityEdge_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MADIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_MADIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_IntegratedIntensityEdge_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_IntegratedIntensityEdge_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_IntegratedIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_IntegratedIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Intensity_UpperQuartileIntensity_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Intensity_UpperQuartileIntensity_PIstain_gray_bright,PIstain_gray_bright_objects|Location_MaxIntensity_Y_PIstain_gray_bright,PIstain_gray_bright_objects|Location_MaxIntensity_Y_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Location_MaxIntensity_X_PIstain_gray_bright,PIstain_gray_bright_objects|Location_MaxIntensity_X_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Location_MaxIntensity_Z_PIstain_gray_bright,PIstain_gray_bright_objects|Location_MaxIntensity_Z_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Location_Center_Y,PIstain_gray_bright_objects|Location_Center_Z,PIstain_gray_bright_objects|Location_Center_X,PIstain_gray_bright_objects|Location_CenterMassIntensity_X_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Location_CenterMassIntensity_X_PIstain_gray_bright,PIstain_gray_bright_objects|Location_CenterMassIntensity_Z_PIstain_gray_bright,PIstain_gray_bright_objects|Location_CenterMassIntensity_Z_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Location_CenterMassIntensity_Y_PIstain_gray_bright,PIstain_gray_bright_objects|Location_CenterMassIntensity_Y_DAPI_gray_nuclei_mask,PIstain_gray_bright_objects|Number_Object_Number,PIstain_gray_bright_objects|Parent_DAPI_gray_nuclei,DAPI_gray_nuclei|Location_CenterMassIntensity_X_PIstain_gray_bright,DAPI_gray_nuclei|Location_CenterMassIntensity_X_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_CenterMassIntensity_X_DAPI_gray_bright,DAPI_gray_nuclei|Location_CenterMassIntensity_Y_DAPI_gray_bright,DAPI_gray_nuclei|Location_CenterMassIntensity_Y_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_CenterMassIntensity_Y_PIstain_gray_bright,DAPI_gray_nuclei|Location_CenterMassIntensity_Z_PIstain_gray_bright,DAPI_gray_nuclei|Location_CenterMassIntensity_Z_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_CenterMassIntensity_Z_DAPI_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_Z_PIstain_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_Z_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_MaxIntensity_Z_DAPI_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_X_PIstain_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_X_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_MaxIntensity_X_DAPI_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_Y_PIstain_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_Y_DAPI_gray_bright,DAPI_gray_nuclei|Location_MaxIntensity_Y_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Location_Center_Y,DAPI_gray_nuclei|Location_Center_X,DAPI_gray_nuclei|Location_Center_Z,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MeanIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MeanIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MedianIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MedianIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MADIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MADIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_UpperQuartileIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_UpperQuartileIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MeanIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MeanIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_StdIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_StdIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MassDisplacement_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MassDisplacement_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MinIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MinIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_LowerQuartileIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_LowerQuartileIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MaxIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MaxIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_IntegratedIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_IntegratedIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MinIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MinIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MaxIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_MaxIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_IntegratedIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_IntegratedIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_StdIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Intensity_StdIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_Z_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_Z_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_X_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_X_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_Y_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_CenterMassIntensity_Y_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_Z_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_Z_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_X_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_X_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_Y_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_MaxIntensity_Y_PIstain_gray_bright,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_Center_Z,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_Center_X,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Location_Center_Y,DAPI_gray_nuclei|Mean_PIstain_gray_bright_objects_Number_Object_Number,DAPI_gray_nuclei|Intensity_IntegratedIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_IntegratedIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_IntegratedIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_LowerQuartileIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_LowerQuartileIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_LowerQuartileIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MedianIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MedianIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MedianIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_UpperQuartileIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_UpperQuartileIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_UpperQuartileIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_StdIntensityEdge_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_StdIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_StdIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MassDisplacement_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MassDisplacement_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MassDisplacement_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensityEdge_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MeanIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MinIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MinIntensityEdge_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MinIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MaxIntensityEdge_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MaxIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MaxIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_StdIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_StdIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_StdIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MinIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MinIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MinIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_MADIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MADIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MADIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_IntegratedIntensityEdge_PIstain_gray_bright,DAPI_gray_nuclei|Intensity_IntegratedIntensityEdge_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_IntegratedIntensityEdge_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MaxIntensity_DAPI_gray_nuclei_mask,DAPI_gray_nuclei|Intensity_MaxIntensity_DAPI_gray_bright,DAPI_gray_nuclei|Intensity_MaxIntensity_PIstain_gray_bright,DAPI_gray_nuclei|Number_Object_Number,DAPI_gray_nuclei|Children_PIstain_gray_bright_objects_Count,Experiment|Pipeline_Pipeline,Experiment|Modification_Timestamp,Experiment|Run_Timestamp,Experiment|CellProfiler_Version
+    Representation of Nan/Inf:Null
+    Add a prefix to file names?:Yes
+    Filename prefix:250423_
+    Overwrite existing files without warning?:Yes
+    Data to export:Image
+    Combine these object measurements with those of the previous object?:No
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
+    Data to export:Object relationships
+    Combine these object measurements with those of the previous object?:No
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
+
+ExportToDatabase:[module_num:19|svn_version:'Unknown'|variable_revision_number:28|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:False|wants_pause:False]
+    Database type:SQLite
+    Database name:DefaultDB
+    Add a prefix to table names?:Yes
+    Table prefix:i3N
+    Output file location:Default Input Folder sub-folder|Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Images/250421_CellProfiler_1
+    Create a CellProfiler Analyst properties file?:No
+    Database host:
+    Username:
+    Password:
+    Name the SQLite database file:250423_CellProfiler_shRNA.db
+    Calculate the per-image mean values of object measurements?:No
+    Calculate the per-image median values of object measurements?:Yes
+    Calculate the per-image standard deviation values of object measurements?:Yes
+    Calculate the per-well mean values of object measurements?:No
+    Calculate the per-well median values of object measurements?:No
+    Calculate the per-well standard deviation values of object measurements?:No
+    Export measurements for all objects to the database?:All
+    Select the objects:DAPI_gray_nuclei,PIstain_gray_bright_objects
+    Maximum # of characters in a column name:64
+    Create one table per object, a single object table or a single object view?:Single object table
+    Enter an image url prepend if you plan to access your files via http:
+    Write image thumbnails directly to the database?:No
+    Select the images for which you want to save thumbnails:
+    Auto-scale thumbnail pixel intensities?:Yes
+    Select the plate type:None
+    Select the plate metadata:None
+    Select the well metadata:None
+    Include information for all images, using default values?:Yes
+    Properties image group count:1
+    Properties group field count:1
+    Properties filter field count:0
+    Workspace measurement count:1
+    Experiment name:250423_CP_
+    Which objects should be used for locations?:DAPI_gray_nuclei
+    Enter a phenotype class table name if using the Classifier tool in CellProfiler Analyst:
+    Export object relationships?:Yes
+    Overwrite without warning?:Never
+    Access CellProfiler Analyst images via URL?:No
+    Select the classification type:Object
+    Select an image to include:None
+    Use the image name for the display?:Yes
+    Image name:Channel1
+    Channel color:red
+    Do you want to add group fields?:No
+    Enter the name of the group:
+    Enter the per-image columns which define the group, separated by commas:ImageNumber, Image_Metadata_Plate, Image_Metadata_Well
+    Do you want to add filter fields?:No
+    Automatically create a filter for each plate?:No
+    Create a CellProfiler Analyst workspace file?:No
+    Select the measurement display tool:ScatterPlot
+    Type of measurement to plot on the X-axis:Image
+    Enter the object name:None
+    Select the X-axis measurement:None
+    Select the X-axis index:ImageNumber
+    Type of measurement to plot on the Y-axis:Image
+    Enter the object name:None
+    Select the Y-axis measurement:None
+    Select the Y-axis index:ImageNumber
+
+OverlayObjects:[module_num:20|svn_version:'Unknown'|variable_revision_number:1|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Input:DAPI_gray_bright
+    Name the output image:DAPI_obj_overlay
+    Objects:DAPI_gray_nuclei
+    Opacity:0.3
+
+OverlayObjects:[module_num:21|svn_version:'Unknown'|variable_revision_number:1|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Input:PIstain_gray_bright
+    Name the output image:PIstain_obj_overlay
+    Objects:PIstain_gray_bright_objects
+    Opacity:0.1
+
+SaveImages:[module_num:22|svn_version:'Unknown'|variable_revision_number:16|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the type of image to save:Image
+    Select the image to save:DAPI_obj_overlay
+    Select method for constructing file names:From image filename
+    Select image name for file prefix:DAPI
+    Enter single file name:OrigBlue
+    Number of digits:4
+    Append a suffix to the image file name?:No
+    Text to append to the image name:
+    Saved file format:tiff
+    Output file location:Default Input Folder sub-folder|Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Images/250421_CellProfiler_1/Images
+    Image bit depth:8-bit integer
+    Overwrite existing files without warning?:No
+    When to save:Every cycle
+    Record the file and path information to the saved image?:No
+    Create subfolders in the output folder?:No
+    Base image folder:Default Input Folder sub-folder|Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Images/250421_CellProfiler_1/Images
+    How to save the series:T (Time)
+    Save with lossless compression?:Yes
+
+SaveImages:[module_num:23|svn_version:'Unknown'|variable_revision_number:16|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the type of image to save:Image
+    Select the image to save:PIstain_obj_overlay
+    Select method for constructing file names:From image filename
+    Select image name for file prefix:PIstain
+    Enter single file name:OrigBlue
+    Number of digits:4
+    Append a suffix to the image file name?:No
+    Text to append to the image name:
+    Saved file format:tiff
+    Output file location:Default Input Folder sub-folder|Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Images/250421_CellProfiler_1/Images
+    Image bit depth:8-bit integer
+    Overwrite existing files without warning?:No
+    When to save:Every cycle
+    Record the file and path information to the saved image?:No
+    Create subfolders in the output folder?:No
+    Base image folder:Elsewhere...|
+    How to save the series:T (Time)
+    Save with lossless compression?:Yes
+"
+Run_Timestamp,2025-04-23T17:56:18.376135
