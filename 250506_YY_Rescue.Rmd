@@ -44,29 +44,41 @@ rm(CRANpackages,biocPackages)
 ## Data
 ```{r data}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
-cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
-scores_df <- read_delim("data/240924_YY_rescue.csv")
-
-# Filter knockdown genes to those kept in final CE dictionary
-oddKD <- unique(scores_df$gene)[which(!(unique(scores_df$gene) %in% c(cryptic_df$`Gene Symbol`, "GFP","shCTR")))]
-scores_df <- scores_df %>%  filter(!(gene %in% c("TCF25")))
+cryptic_df <- read_delim("data/250509_CE_table.csv")
+scores_df <- read_delim("data/250509_IS_Rescue_YY_Quant_Pool.csv")
 
 ```
 
-## Normalize scores to shCTR-GFP and shTDP43-GFP
+## Normalize scores to shCTR-GFP and shTDP43-GFP by batch
 ```{r norm}
-# Normalize survival
+# Determine survival per well (each n)
+scores_df$survival = 1-as.numeric(scores_df$pctPI)
+scores_df <- scores_df %>% group_by(Batch, OE, Rep) %>% summarize(survival = mean(survival))
+
+# Normalize survival (pctPI-)
 # 0 = shTDP43-GFP
 # 1 = shCTR-GFP
+# Note: batch 5 has no shCTR-GFP values. Avg from other batches used
 
-scores_df$survival = as.numeric(scores_df$survival)
-df_summary <- scores_df %>% group_by(gene) %>% summarize(med = median(survival)) %>% arrange(med)
+batches = unique(scores_df$Batch)
+scores_df$Norm = NA
 
-minVal = df_summary$med[which(df_summary$gene == "GFP")]
-maxVal = df_summary$med[which(df_summary$gene == "shCTR")]
+for(i in batches){
+  r = which(scores_df$Batch == i)
+  df_temp <- scores_df[r,]
+  
+  maxSurv = which(df_temp$OE == "shCtrl")
+  minSurv = which(df_temp$OE == "GFP")
+  max = median(df_temp$survival[maxSurv])
+  min = median(df_temp$survival[minSurv])
+  
+  scores_df$Norm[r] = round((scores_df$survival[r] - min)/(max-min),3)
+  rm(r,maxSurv,minSurv,max,min,i, df_temp)
+}
 
-scores_df$Norm = round((scores_df$survival - minVal)/(maxVal-minVal),3)
+scores_df <- scores_df %>% filter(OE != "GRAMD1A\t\t")
 
+df_summary <- scores_df %>% group_by(OE) %>% summarize(med = median(Norm)) %>% arrange(med)
 
 ```
 
@@ -75,18 +87,20 @@ scores_df$Norm = round((scores_df$survival - minVal)/(maxVal-minVal),3)
 ## Visualize
 ```{r visual}
 # generate colors
-pal <- scales::gradient_n_pal(colours = c("#820000","white","#002D72"), values= c(0, 0.253,0.5))
+pal <- scales::gradient_n_pal(colours = c("#820000","white","#002D72"), values= c(-0.2, 0,0.2))
 df_summary$fillColor <- pal(df_summary$med)
-df_summary$fillColor[which(df_summary$gene == "GFP")] = "#820000"
-order = df_summary$gene
+df_summary <- df_summary %>% 
+  mutate(fillColor = ifelse(med <= -0.2, "#820000",
+                            ifelse(med >= 0.2, "#002D72", fillColor)))
+# df_summary$fillColor[which(df_summary$OE == "GFP")] = "#820000"
+order = df_summary$OE
 
-scores_df %>% mutate(gene = factor(gene, levels = order)) %>%
-  filter(gene != "shCTR")%>%
-  ggplot(aes(x=gene,y=Norm, fill = gene)) +
-  geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
+scores_df %>% mutate(OE = factor(OE, levels = order)) %>%
+  ggplot(aes(x=OE,y=Norm, fill = OE)) +
+  geom_jitter(alpha=0.5, width=0.2, size=3, color="black")+
   geom_boxplot(alpha=0.7, outliers = F) + 
   scale_fill_manual(values=df_summary$fillColor) +
-  theme_classic()+ scale_y_continuous(expand = c(0, 0),limits = c(-0.3,0.7))+
+  theme_classic()+ # scale_y_continuous(expand = c(0, 0),limits = c(-1.1,1.1))+
   theme(text = element_text(color="black", family = "Helvetica", size=15),
         axis.text.x = element_text(angle = 45, hjust=1), legend.position = "none")+
   xlab("")+ylab("Survival")+
