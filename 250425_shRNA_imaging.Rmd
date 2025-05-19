@@ -101,6 +101,11 @@ for(i in 1:nrow(df_meta)){
   rm(r,i)
 }
 
+wellkeyFull <- data.frame(wellkeyFull)
+#df <- apply(wellkeyFull,2,as.character)
+
+#write.csv(df,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/output_tables/wellKeyFull.csv")
+
 ```
 
 ## Cell/Image Analysis
@@ -121,10 +126,10 @@ df_meta %>% ggplot(aes(x=as.character(Metadata_plate), y=Count_DAPI_gray_nuclei)
                      ref.group = ".all.")+xlab("# nuclei") +ylab("Plate")
 
 # Add total cells with PI (%) to df_meta as PctPI
-df <- df %>% mutate(Children_PIstain_gray_bright_objects_Count = ifelse(Children_PIstain_gray_bright_objects_Count > 1, 1, Children_PIstain_gray_bright_objects_Count)) %>%
+df_meta_img <- df %>% mutate(Children_PIstain_gray_bright_objects_Count = ifelse(Children_PIstain_gray_bright_objects_Count > 1, 1, Children_PIstain_gray_bright_objects_Count)) %>%
   group_by(ImageNumber) %>% summarize(PIcells = sum(Children_PIstain_gray_bright_objects_Count))
 
-df_meta <- df_meta %>% left_join(df,by = "ImageNumber")
+df_meta <- df_meta %>% left_join(df_meta_img,by = "ImageNumber")
 
 # For each shRNA: avg based on well
 df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
