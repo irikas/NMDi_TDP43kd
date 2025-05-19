@@ -2,7 +2,7 @@
 <p> The scripts included in this repository were used to analyze data regarding the composition of TDP-43-associated cryptic exons, differential gene expression as a result of TDP-43 KD, toxicity of single target knockdown, and survival of cells after over-expression of selected TDP-43 targets in shTDP43-treated cells. Some raw data files are also included and others can be available upon request. </p> 
   
 ## Publication
-<p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Sandal P.S., Li Y, Burns G.D., Cruz AF, Sun S, Wong PC, Ling JP. Expanded Detection of Cryptic Exons Through Nonsense-Mediated Decay Inhibition Reveals Broad Landscape of TDP-43 Targets. <i>bioRxiv</i>. doi: TBD </p>
+<p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Sandal PS, Li Y, Burns G.D., Cruz AF, Sun S, Wong PC, Ling JP. Expanded Detection of Cryptic Exons Through Nonsense-Mediated Decay Inhibition Reveals Broad Landscape of TDP-43 Targets. <i>bioRxiv</i>. doi: TBD </p>
 
 <p>Irika R. Sinha and Yingzhi Ye are co-first authors (#)</p>
 
@@ -71,7 +71,6 @@
     <td>nf-core/RNAseq pipeline info output</td>
   </tr>
 </table>
-<p>*R Markdown document included as html. Download to open properly.</p>
 
 ### Output tables
 <table style="width:100% min-width: fit-content">
