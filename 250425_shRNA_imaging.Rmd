@@ -135,6 +135,10 @@ df_meta <- df_meta %>% left_join(df_meta_img,by = "ImageNumber")
 df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
 df_graph <- df_graph %>% group_by(Metadata_plate,shRNA, well) %>% summarize(pctPI = mean(pctPI))
 
+# For each shRNA: avg based on well
+df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
+df_graph <- df_graph %>% group_by(Metadata_plate,shRNA, well) %>% summarize(pctPI = mean(pctPI))
+
 ## For each plate - score based on TDP-43 and ctrl (internal controls)
 # Calculate average PI of each shRNA by plate
 # Normalize toxicity between 0 and 1 with TDP-43 pctPI set to 1 and ctrl's to 0
