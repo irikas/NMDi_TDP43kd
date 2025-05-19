@@ -18,7 +18,6 @@ The purpose of this script is to take the file with manually identified cryptic 
 ```{r packages}
 CRANpackages <- c("tidyverse", "ggplot2","gghighlight","ggpubr","ggrepel")
 
-# CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
 biocPackages <- c()
 
 for(i in CRANpackages){
@@ -49,7 +48,7 @@ setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/
 df <- read_delim("data/250424_DAPI_gray_nuclei.csv")[1:3]
 df_meta <- read_delim("data/250424_Image.csv") %>% 
   dplyr::select(starts_with(c("ImageNumber","Count","ModuleError",
-                              "Metadata_plate","Metadata_well","FileName"))) %>% 
+                              "Metadata_plate","Metadata_well"))) %>% 
   pivot_longer(cols=starts_with("ModuleError"),
                names_to = "Module",names_prefix = "ModuleError",
                values_to = "Error")
@@ -66,6 +65,7 @@ key <- read_delim("data/250424_Key_shRNA.csv")
 ## Create well map for images
 orderWellImage <- c(paste0("B",2:7),paste0("C",7:2),paste0("D",2:7),paste0("E",7:2))
 wellKey <- data.frame(plate = NA, well = orderWellImage, imgNs = NA,shRNA=NA)
+rm(orderWellImage)
 
 for(i in 1:nrow(wellKey)){
   start = 6*(i-1)+1
@@ -89,12 +89,15 @@ for(i in 1:nrow(key)){
 }
 
 df_meta$shRNA = NA
+df_meta$well = NA
+
 ## Add gene names to metadata
 for(i in 1:nrow(df_meta)){
   r = which(wellkeyFull$plate == as.numeric(df_meta$Metadata_plate[i]) & 
               sapply(wellkeyFull$imgNs, 
                      function(x) as.character(as.numeric(df_meta$Metadata_Well[i])) %in% x))
   df_meta$shRNA[i] = wellkeyFull$shRNA[r]
+  df_meta$well[i] = wellkeyFull$well[r]
   rm(r,i)
 }
 
@@ -102,7 +105,7 @@ for(i in 1:nrow(df_meta)){
 
 ## Cell/Image Analysis
 ```{r QC}
-cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+cryptic_df <- read_delim("data/250509_CE_table.csv")
 df_meta$Metadata_plate <- as.character(df_meta$Metadata_plate)
 
 # There is significant plate to plate variation in the mean number of nuclei/well compared to the overall mean
@@ -123,10 +126,14 @@ df <- df %>% mutate(Children_PIstain_gray_bright_objects_Count = ifelse(Children
 
 df_meta <- df_meta %>% left_join(df,by = "ImageNumber")
 
+# For each shRNA: avg based on well
+df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
+df_graph <- df_graph %>% group_by(Metadata_plate,shRNA, well) %>% summarize(pctPI = mean(pctPI))
+
 ## For each plate - score based on TDP-43 and ctrl (internal controls)
 # Calculate average PI of each shRNA by plate
 # Normalize toxicity between 0 and 1 with TDP-43 pctPI set to 1 and ctrl's to 0
-df_graph <- df_meta %>% mutate(pctPI = PIcells/Count_DAPI_gray_nuclei) 
+
 df_graph$Norm = NA 
 
 for(i in 1:8){
@@ -154,22 +161,25 @@ df_graph <- df_graph %>% filter(shRNA %in% filtshRNA)
 df_Calc <- df_graph %>% group_by(gene) %>% summarize(med= round(median(Norm),5))
 
 # visualize toxicity scores
-orderS <- unique((df_Calc %>% arrange(-med))$gene)
-
+# generate colors
+pal <- scales::gradient_n_pal(colours = c("#820000","white"), values= c(1, 0))
+df_Calc$fillColor <- pal(df_Calc$med)
+df_Calc <- df_Calc %>% 
+  mutate(fillColor = ifelse(med >= 1, "#820000",
+                            ifelse(med <= 0, "white", fillColor)))
+orderS <- unique((df_Calc %>% arrange(med))$gene)
+col <- ((df_Calc %>% arrange(med))$fillColor)
+  
 df_graph %>% mutate(gene = factor(gene, levels = orderS)) %>% 
   ggplot(aes(x=gene,y=Norm)) +
   geom_hline(yintercept = c(0,1),linetype=2,color="#656565") +
   geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
-  geom_boxplot(alpha=0.8, outliers = F,fill="#820000", color="black") +
-  gghighlight(gene %in% c("TARDBP","Ctrl"),
-              unhighlighted_params = list(color="#656565",fill="gray"),
-              use_group_by = F)+
+  geom_boxplot(alpha=0.8, outliers = F,color="black", fill =col) +
   theme_classic()+
   theme(text = element_text(color="black", family = "Helvetica", size=15),
         axis.text.x = element_text(angle = 45, hjust=1))+
-  xlab("")+ylab("% +PI Nuclei (normalized)")+
-  scale_y_continuous(expand=c(0,0), limits=c(-0.6,2.5),breaks = c(-0.5, 0, .50, 1.00, 1.50,2.0,2.5))
-ggsave("output_fig/250506_shRNA_toxicity.png",device = "png", 
+  xlab("")+ylab("% +PI Nuclei (normalized)") 
+ggsave("output_fig/250509_shRNA_toxicity.png",device = "png", 
        width = 50, height = 20, units = "cm",limitsize = FALSE)
  
 # Calculate p-values of difference from control using Wilcox test - not normalized
@@ -179,19 +189,19 @@ df_Calc <- df_graph %>% group_by(shRNA) %>% summarize(med= round(median(Norm),5)
 df_stats <-left_join(df_stats,df_Calc, join_by("group2" == "shRNA"))
 
 # Visualize median toxicity vs. pVal of difference from control
-df_stats %>% mutate(p.adj = ifelse(p.adj <= 10^-10,10^-10,p.adj), label=str_split_i(group2,"_",1)) %>%
+df_stats %>% mutate(label=str_split_i(group2,"_",1)) %>%
   ggplot(aes(x=med,y=-log10(p.adj),label=label)) +
   geom_point(size=4, color="#820000")+
-  gghighlight(p.adj < 0.0001,
+  gghighlight(p.adj < 0.05,
               unhighlighted_params = list(color="#656565",fill="gray", size=4,alpha=0.5))+
   theme_classic()+
+  # geom_hline(yintercept = -log10(0.05))+
   geom_text_repel(min.segment.length = 0.5,  box.padding = 0.5, fill=NA,label.size = NA,max.overlaps = Inf)+
   theme(text = element_text(color="black", family = "Helvetica", size=25),
         axis.text.x = element_text(angle = 45, hjust=1),
         plot.margin = margin(t=1,unit = "cm"))+
-  ylab("-log10p")+xlab("% +PI Nuclei (normalized)")+
-  scale_x_continuous(expand=c(0,0), limits=c(-0.3,1.6),breaks = c(-0.5,0, .50, 1.00, 1.50))
-ggsave("output_fig/250506_shRNA_toxicity_pVal.png",device = "png", 
+  ylab("-log10p")+xlab("% +PI Nuclei (normalized)")
+ggsave("output_fig/250509_shRNA_toxicity_pVal.png",device = "png", 
        width = 20, height = 20, units = "cm",limitsize = FALSE)
 
 # Visualize median toxicity vs. LFC
@@ -206,21 +216,21 @@ for(i in 1:nrow(cryptic_df)){
 df_plot <- df_stats %>% mutate(p.adj = ifelse(p.adj <= 10^-10,10^-10,p.adj), label=str_split_i(group2,"_",1)) %>%
   left_join(resLFC_adj, join_by("label" == "geneName"))
 
-df_plot %>% mutate(padj = ifelse(padj < 10^-50, 10^-50, padj),
-                   p.adj = ifelse(p.adj < 10^-7, 10^-7, p.adj)) %>%
-  ggplot(aes(x=log2FoldChange,y=-log10(p.adj),label=label)) +
+
+# Visualize toxicity vs downregulation
+df_plot %>% 
+  ggplot(aes(x=log2FoldChange,y=med,label=label)) +
   geom_point(size=4, color="#820000")+
-  gghighlight(p.adj < 0.0001,
+  gghighlight(med > 0.7 & log2FoldChange < -1,
               unhighlighted_params = list(color="#656565",fill="gray", size=4,alpha=0.5))+
   theme_classic()+
   geom_text_repel(min.segment.length = 0.5,  box.padding = 0.5, fill=NA,label.size = NA,max.overlaps = Inf)+
   theme(text = element_text(color="black", family = "Helvetica", size=25),
         axis.text.x = element_text(angle = 45, hjust=1),
         plot.margin = margin(t=1,unit = "cm"))+
-  xlab("log2fc")+ylab("-log10p of toxicity")
+  scale_y_continuous(limits=c(0,1.5),breaks = seq(0,1.5,0.25))+
+  xlab("log2fc")+ylab("median toxicity")
 
-ggsave("output_fig/250506_shRNA_toxicity_pVal_vs_log2FC.png",device = "png", 
-       width = 20, height = 20, units = "cm",limitsize = FALSE)
 
 
 ```
