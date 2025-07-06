@@ -5,7 +5,7 @@
 <p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Li Y, Sandal PS, Sun S, Wong PC, Ling JP. Inhibition of nonsense-mediated decay in TDP-43 deficient neurons reveals novel cryptic exons. <i>bioRxiv</i>. doi: <a href="https://www.biorxiv.org/content/10.1101/2025.06.28.661837v1">10.1101/2025.06.28.661837v1</a> </p>
 
 <p>(#) These authors contributed equally: Irika R. Sinha and Yingzhi Ye</p>
-<p>(*) Corresponding authors: Jonathan P. Ling (jling@jhu.edu), Shuying Sun (shuying.sun@jhmi.edu), Philip C. Wong (wong@jhmi.edu)</p>
+<p>(*) Corresponding authors: Jonathan P. Ling, Shuying Sun, Philip C. Wong</p>
 
 ## Contents
 ### Scripts
