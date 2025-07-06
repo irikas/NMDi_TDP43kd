@@ -2,9 +2,10 @@
 <p> The scripts included in this repository were used to analyze data regarding the composition of TDP-43-associated cryptic exons, differential gene expression as a result of TDP-43 KD, toxicity of single target knockdown, and survival of cells after over-expression of selected TDP-43 targets in shTDP43-treated cells. Some raw data files are also included and others can be available upon request. </p> 
   
 ## Publication
-<p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Li Y, Sandal PS, Burns G.D., Cruz AF, Sun S, Wong PC, Ling JP. Expanded Detection of Cryptic Exons Through Nonsense-Mediated Decay Inhibition Reveals Broad Landscape of TDP-43 Targets. <i>bioRxiv</i>. doi: TBD </p>
+<p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Li Y, Sandal PS, Sun S, Wong PC, Ling JP. Inhibition of nonsense-mediated decay in TDP-43 deficient neurons reveals novel cryptic exons. <i>bioRxiv</i>. doi: <a href="https://www.biorxiv.org/content/10.1101/2025.06.28.661837v1">10.1101/2025.06.28.661837v1</a> </p>
 
-<p>Irika R. Sinha and Yingzhi Ye are co-first authors (#)</p>
+<p>(#) These authors contributed equally: Irika R. Sinha and Yingzhi Ye</p>
+<p>(*) Corresponding authors: Jonathan P. Ling (jling@jhu.edu), Shuying Sun (shuying.sun@jhmi.edu), Philip C. Wong (wong@jhmi.edu)</p>
 
 ## Contents
 ### Scripts
@@ -110,12 +111,13 @@
 <a href="https://nf-co.re/rnaseq/3.14.0">nf-core/RNAseq</a>
 
 ## Acknowledgements
-This work was supported in part by the Alzheimer’s Association (to J.P.L.), the Institute for Data-Intensive Engineering and Science (to J.P.L.), , the Robert Packard Center for ALS Research at Johns Hopkins (to P.C.W.), the Target ALS Foundation (to P.C.W.), ALS Finding a Cure (to P.C.W.), the ALS Association (to P.C.W.), and the US Food and Drug Administration (no. 1U01FD008129 to P.C.W.). 
+This work was supported in part by the Alzheimer’s Association (to J.P.L.), the Institute for Data-Intensive Engineering and Science (to J.P.L.), the NIH RF1NS095969 and RF1NS129878 (to P.C.W.), the RF1NA127925 and RF1AG078948 (to S.S.), ALS Finding a Cure (to P.C.W.), the ALS Association (to P.C.W.), the US Food and Drug Administration (no. 1U01FD008129 to P.C.W.), and Toffler Scholar Award (to Y.Y.).
 
 This material is based upon work supported by the National Science Foundation (NSF) Graduate Research Fellowship Program under Grant No. DGE2139757 (to I.R.S.). Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of the NSF.
 
-This work was supported by resources from the Advanced Research Computing at Hopkins (ARCH) core facility (rockfish.jhu.edu), which is supported by the NSF (no. OAC 1920103).
+This work was supported by resources from the Advanced Research Computing at Hopkins (ARCH) core facility (rockfish.jhu.edu), which is supported by the NSF (no. OAC 1920103). We thank Dr. Ricardo de Souza Jacomini for his support installing Leafcutter.
 
 We thank Katherine E. Irwin and Anya A. Kim for their troubleshooting support and suggestions.
+
 
 
