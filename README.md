@@ -2,7 +2,7 @@
 <p> The scripts included in this repository were used to analyze data regarding the composition of TDP-43-associated cryptic exons, differential gene expression as a result of TDP-43 KD, toxicity of single target knockdown, and survival of cells after over-expression of selected TDP-43 targets in shTDP43-treated cells. Some raw data files are also included and others can be available upon request. </p> 
   
 ## Publication
-<p>Sinha I.R.<sup>(#)</sup>, Ye, Y<sup>(#)</sup>, Li Y, Sandal PS, Sun S<sup>(*)</sup>, Wong PC<sup>(*)</sup>, Ling JP<sup>(*)</sup>. Inhibition of nonsense-mediated decay in TDP-43 deficient neurons reveals novel cryptic exons. <i>bioRxiv</i>. doi: <a href="https://www.biorxiv.org/content/10.1101/2025.06.28.661837v1">10.1101/2025.06.28.661837v1</a> </p>
+<p>Sinha I.R.<sup>#</sup>, Ye, Y<sup>#</sup>, Li Y, Sandal PS, Sun S<sup>*</sup>, Wong PC<sup>*</sup>, Ling JP<sup>*</sup>. Inhibition of nonsense-mediated decay in TDP-43 deficient neurons reveals novel cryptic exons. <i>bioRxiv</i>. doi: <a href="https://www.biorxiv.org/content/10.1101/2025.06.28.661837v1">10.1101/2025.06.28.661837v1</a> </p>
 
 <p>(#) These authors contributed equally: Irika R. Sinha and Yingzhi Ye</p>
 <p>(*) Corresponding authors: Jonathan P. Ling, Shuying Sun, Philip C. Wong</p>
