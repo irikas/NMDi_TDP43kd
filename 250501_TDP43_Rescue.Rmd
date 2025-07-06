@@ -1,0 +1,168 @@
+---
+title: "250501_TDP43_Rescue"
+author: "Irika Sinha"
+date: "2025-05-01"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the file output of CellProfiler and figure out which rescues worked
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2","gghighlight","ggpubr","ggrepel")
+
+# CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
+biocPackages <- c()
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+## Data
+```{r data}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+cryptic_df <- read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+
+# Load CellProfiler Output
+df_values <- read_delim("data/250501_DAPI_gray_nuclei.csv")[1:3]
+df_meta <- read_delim("data/250501_Image.csv") %>% 
+  dplyr::select(starts_with(c("ImageNumber","Count","ModuleError",
+                              "Metadata","FileName"))) %>% 
+  pivot_longer(cols=starts_with("ModuleError"),
+               names_to = "Module",names_prefix = "ModuleError",
+               values_to = "Error")
+
+# Clean metadata file
+# Were there any errors?
+which(df_meta$Error != 0)
+df_meta <- df_meta %>% dplyr::select(!c("Module","Error")) %>% unique()
+df_meta$FileName_DAPI = gsub(pattern = "4_28_2025_", replacement = "" , x=df_meta$FileName_DAPI)
+
+# Create key file
+df_meta_pruned <- df_meta %>% dplyr::select(starts_with(c("ImageNumber","Count","FileName_DAPI"))) %>%
+  filter(!str_detect(FileName_DAPI, ".ORG.tif")) %>% 
+  separate_wider_delim(cols="FileName_DAPI",delim = "_",names = c("date","rescue","export","channel")) %>%
+  mutate(shRNA = str_split_i(string = rescue,pattern = "-| ",1),
+         gene = str_split_fixed(string = rescue,pattern = "-| ",2)[,2],
+         rep = str_split_i(rescue,paste0(str_split_i(gene,"-\\d",1),"-"),2),
+         gene = str_split_i(gene,"-\\d",1),
+         rep = ifelse(is.na(rep),gene,rep),
+         gene = ifelse(!is.na(as.numeric(gene)),NA, gene)) %>%
+  dplyr::select(!c("rescue","export","channel"))
+
+# Manual name cleanup
+df_meta_pruned <- df_meta_pruned %>% mutate(gene = ifelse(gene == "GRAMD1A 4MOI","GRAMD1A",gene),
+                                            gene = ifelse(str_detect(gene,"-TILE"),gsub("-TILE","",gene),
+                                                          ifelse(str_detect(gene,"TILE"),gsub("TILE","",gene), gene)))
+
+# write.csv(df_meta_pruned,"output_tables/250506_df_meta_pruned_rescue.csv")
+
+```
+
+## Make calculations of pctPI
+
+```{r calc}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+
+# df_meta_pruned <- read_delim("output_tables/250506_df_meta_pruned_rescue.csv")
+
+# Determine number of PI+ nuclei
+df_summ <- df_values %>% mutate(Children_PIstain_gray_bright_objects_Count = 
+                                  ifelse(Children_PIstain_gray_bright_objects_Count > 0, 1, 
+                                Children_PIstain_gray_bright_objects_Count)) %>%
+  group_by(ImageNumber) %>% summarize(posNuc = sum(Children_PIstain_gray_bright_objects_Count))
+
+# Merge nPI+ nuclei with the metadata
+df_merge <- left_join(df_meta_pruned,df_summ,join_by("ImageNumber")) %>% 
+  mutate(pctPI = posNuc/Count_DAPI_gray_nuclei)
+
+# Set true negatives
+df_merge <- df_merge %>% mutate(gene = ifelse(((shRNA %in% c("shCTR","shTDP")) & (gene %in% c("GFP","shCTR","") )), 
+                                              "-",gene),
+                                gene = ifelse(is.na(gene), "-", gene),
+                                treatment = paste0(shRNA,"_",gene)) %>%
+  filter(str_detect(treatment, "shCTR_[:alpha:]", negate=T))
+
+# Filter knockdown genes to those kept in final CE dictionary
+oddKD <- unique(df_merge$gene)[which(!(unique(df_merge$gene) %in% c(cryptic_df$`Gene Symbol`, "GFP","shCTR","-")))]
+df_merge <- df_merge %>% mutate(gene = ifelse(gene == "RANBP", "RANBP1", gene),
+                                gene = ifelse(gene == "GRAMD1A CORO7", "GRAMD1A-CORO7", gene)) %>%
+  filter(!(gene %in% c("TCF25","shLSM7")), shRNA != "NG")
+
+# Normalize pctPI
+# 1 = shTDP43 or (shTDP43 + GFP OE) or (shTDP43 + shCTR OE)
+# 0 = shCTR or (shCTR + GFP OE)
+
+uniqueDates = unique(df_merge$date)
+df_merge$Norm = NA
+
+for(i in uniqueDates){
+  r = which(df_merge$date == i)
+  df_temp <- df_merge[r,]
+  maxR = which(df_temp$shRNA == "shTDP" & df_temp$gene == "-")
+  minR = which(df_temp$shRNA == "shCTR" & df_temp$gene == "-")
+  max = median(df_temp$pctPI[maxR])
+  min = median(df_temp$pctPI[minR])
+  
+  df_merge$Norm[r] = round((df_merge$pctPI[r] - min)/(max-min),3)
+  rm(r,maxR,minR,max,min,i, df_temp)
+}
+
+# write.csv(df_merge, "output_tables/250506_df_pctPI_rescue.csv")
+
+# Set order for graph
+df_merge <- df_merge %>% mutate(gene = ifelse((gene == "-" & shRNA == "shCTR"), "Ctrl", gene),
+                                gene = ifelse((gene == "-" & shRNA == "shTDP"), "TDP43 KD", gene)) 
+
+df_graph <- df_merge %>%  group_by(treatment, gene) %>% summarize(med = median(Norm)) %>% arrange(med)
+orderS <- unique(df_graph$gene)
+
+# visualize toxicity scores
+
+df_merge %>% mutate(gene = factor(gene, levels = orderS)) %>%
+  ggplot(aes(x=gene,y=Norm)) +
+  # geom_hline(yintercept = c(0,1),linetype=2,color="#656565") +
+  geom_jitter(alpha=0.5, width=0.2, size=1.5, color="black")+
+  geom_boxplot(alpha=0.8, outliers = F,fill="#820000", color="black") +
+  gghighlight(gene == "TDP43 KD",
+              unhighlighted_params = list(color="#656565",fill="gray"),
+              use_group_by = F)+
+  theme_classic()+
+  theme(text = element_text(color="black", family = "Helvetica", size=15),
+        axis.text.x = element_text(angle = 45, hjust=1))+
+  xlab("")+ylab("% +PI Nuclei (normalized)")+
+  scale_y_continuous(expand=c(0,0), limits=c(-1,3),breaks = c(-0.5, 0, .50, 1.00, 1.50, 2.0, 2.5, 3))
+ggsave("output_fig/250506_shRNA_toxicity.png",device = "png", 
+       width = 50, height = 20, units = "cm",limitsize = FALSE)
+
+# Calculate p-values of difference from control using Wilcox test - not normalized
+df_stats <- compare_means(formula= Norm ~ gene, data=df_merge, ref.group = "TDP43 KD", method = "wilcox.test")
+
+
+
+
+```

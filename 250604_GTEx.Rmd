@@ -1,0 +1,102 @@
+---
+title: "250602_GTEx"
+author: "Irika Sinha"
+date: "2025-06-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","pheatmap")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+#library("clusterProfiler","org.Hs.eg.db")
+
+```
+
+```{r Files}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
+cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv") %>% filter(`Gene Symbol` != "GDAP1L1")
+
+cryptic_df_NMD <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
+                                    NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
+                                    NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
+                                    NMDonly1pct = ifelse(avgT <= 1, "1pct", "TDPKDonly")) %>%
+  pivot_longer(cols=c("NMDonly10pct","NMDonly5pct","NMDonly1pct"), 
+               names_to = "NMDonly", values_to = "category",
+               names_prefix = "NMDonly") %>% 
+  mutate(category = ifelse(is.na(category), NMDonly, category),
+         category = ifelse(category == "TDPKDonly","TDPKDonly","NMDi"),
+         NMDonly = factor(NMDonly, c("10pct","5pct","1pct"))) 
+nmdOnlyCEs <- cryptic_df_NMD[which(cryptic_df_NMD$NMDonly == "1pct" & cryptic_df$category == "NMDi"),] %>%
+  dplyr::select(`Gene Symbol`,`CE Detail`,`ID #`,`Canonical Splice Junction`, `LeftJunction`, `RightJunction`, maxTDP,maxCtrl)
+gtex <- read_delim("data/gtex_nauc.csv")
+
+```
+```{r gtexAll}
+gtex_CE <- (gtex %>% filter(gene_id %in% cryptic_df$`Ensembl ID`))[,-1] %>%
+  pivot_longer(cols=2:57, names_to="tissue", values_to="NAUC") %>% mutate(NAUC = ifelse(NAUC >= 10,10,NAUC)) %>%
+  pivot_wider(names_from = "tissue", values_from="NAUC") %>% column_to_rownames("gene_symbol") 
+
+p1 <- pheatmap(t(as.matrix(gtex_CE,sparse=T)),cluster_rows = F, cluster_cols = T,
+         border_color = "white",legend=F,na_col = "gray",
+         color = viridis(n = 256, alpha = 1,begin = 0, end = 1, option = "rocket"),fontsize = 2)
+df <- data.frame(names=(rownames(gtex_CE)[p1$tree_col$order]))
+str_flatten(df$names[1:49],collapse = ", ")
+
+# High Exp All
+cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
+gtex_CE <- (gtex %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`))[,-1] %>%
+  pivot_longer(cols=2:57, names_to="tissue", values_to="NAUC") %>% mutate(NAUC = ifelse(NAUC >= 10,10,NAUC)) %>%
+  pivot_wider(names_from = "tissue", values_from="NAUC") %>% column_to_rownames("gene_symbol") 
+
+pheatmap(t(as.matrix(gtex_CE,sparse=T)),cluster_rows = F, cluster_cols = T,
+         border_color = NA,legend=F,na_col = "gray",
+         color = viridis(n = 256, alpha = 1,begin = 0, end = 1, option = "rocket"),fontsize = 5)
+
+# High Exp Top
+cryptic_df_high <- cryptic_df_high[,c(1:19,52:53)] %>% 
+  arrange(desc(maxTDP)) %>% top_n(30,wt=maxTDP) 
+
+gtex_CE <- (gtex %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`))[,-1] %>%
+  pivot_longer(cols=2:57, names_to="tissue", values_to="NAUC") %>% mutate(NAUC = ifelse(NAUC >= 10,10,NAUC)) %>%
+  pivot_wider(names_from = "tissue", values_from="NAUC") %>% column_to_rownames("gene_symbol") 
+
+p1<- pheatmap(t(as.matrix(gtex_CE,sparse=T)),cluster_rows = F, cluster_cols = T,
+         border_color = NA,legend=F,na_col = "gray",
+         color = viridis(n = 256, alpha = 1,begin = 0, end = 1, option = "rocket"),fontsize = 5)
+df <- data.frame(rev(rownames(gtex_CE)[p1$tree_col$order]))
+
+# NMD only 1%
+gtex_CE <- (gtex %>% filter(gene_id %in% nmdOnlyCEs$`Ensembl ID`))[,-1] %>%
+  pivot_longer(cols=2:57, names_to="tissue", values_to="NAUC") %>% mutate(NAUC = ifelse(NAUC >= 10,10,NAUC)) %>%
+  pivot_wider(names_from = "tissue", values_from="NAUC") %>% column_to_rownames("gene_symbol") 
+
+pheatmap(t(as.matrix(gtex_CE,sparse=T)),cluster_rows = F, cluster_cols = T,
+         border_color = NA,legend=F,na_col = "gray",
+         color = viridis(n = 256, alpha = 1,begin = 0, end = 1, option = "rocket"),fontsize = 5)
+
+
+cryptic_df %>% filter(`ID #` %in% c("CE119","CE265","CE154","CE235", "CE272","CE236","CE240")) %>%
+  mutate(yName = paste0(`Gene Symbol`,"_",`CE Detail`)) %>%
+  pivot_longer(42:51, names_to = "condition", names_prefix = "avg", values_to = "PSI") %>%
+  mutate(condition = factor(condition, levels=rev(c("Ctrl", "CXS", "CX", "CUS","CXU", "T","TXS","TX","TUS","TXU")))) %>%
+  ggplot(aes(x=yName,y=condition,fill=PSI))+ geom_tile()+
+  theme_minimal() + xlab("") + ylab("") + 
+  theme(text = element_text(color="black", family="Helvetica", size =25),
+        axis.text.x = element_text(angle = 30, hjust=1))+
+  scale_fill_viridis_c(option = "F", na.value = "gray", limits = c(0, 50))
+
+
+```
+

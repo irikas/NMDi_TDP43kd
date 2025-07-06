@@ -1,0 +1,117 @@
+---
+title: "250520_NMD_DGE"
+author: "Irika Sinha"
+date: "2025-05-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Purpose
+
+The purpose of this script is to confirm knockdown of NMD factors in different conditions.
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
+biocPackages <- c("apeglm", "DESeq2","limma")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+## DEG analysis
+Nextflow RNA-seq pipeline used to generate DESeq2 objects.
+Used DESeq2 vignette to write analysis script: https://www.bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
+
+```{r DESeq2}
+# Load data
+load("data/nmdi_all_deseq2.dds.RData")
+
+# Add metadata
+# Add experiment design
+colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
+colnames(dds@colData)[which(colnames(dds@colData) == "Group2")] = "Rep"
+dds@colData$NMDi = as.factor(c(rep("ctrl",2),rep("US",2),rep("X",2),rep("XS",2),rep("XU",2),
+                               rep("ctrl",4), rep("US",2),rep("X",2),rep("XS",2),rep("XU",2)))
+dds@colData$tdp = as.factor(c(rep("WT",12),rep("KD",10)))
+dds@colData$seqDate = as.factor(c(rep("batch1",10),rep("batch2",12)))
+design(dds) <- ~ seqDate + NMDi + tdp
+dds$NMDi <- relevel(dds$NMDi, ref = "ctrl")
+
+# Pre-filtering
+dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
+
+# DESeq2 Analysis: All conditions
+# Log fold change shrinkage for visualization and ranking: "apeglm is the adaptive t prior shrinkage estimator from the apeglm package (Zhu, Ibrahim, and Love 2018). As of version 1.28.0, it is the default estimator."
+# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
+dds <- DESeq(dds)
+
+resX <- lfcShrink(dds, coef="NMDi_X_vs_ctrl", type="apeglm")
+resXS <- lfcShrink(dds, coef="NMDi_XS_vs_ctrl", type="apeglm")
+resUS <- lfcShrink(dds, coef="NMDi_US_vs_ctrl", type="apeglm")
+resXU <- lfcShrink(dds, coef="NMDi_XU_vs_ctrl", type="apeglm")
+
+# Exp visualization
+df_ID = data.frame(genes = c("XRN1", "SMG6", "UPF1"), 
+                   ensg = c("ENSG00000114127", "ENSG00000070366", "ENSG00000005007"))
+
+for(i in list(resX,resXS,resUS,resXU)){
+  df_ID$new = c(i["ENSG00000114127",]$log2FoldChange,
+                i["ENSG00000070366",]$log2FoldChange,
+                i["ENSG00000005007",]$log2FoldChange)
+  colnames(df_ID)[ncol(df_ID)] = deparse(quote(i))
+  rm(i)
+}
+
+colnames(df_ID)[3:6] = c("X", "XS", "US", "XU")
+df_ID <- df_ID %>% pivot_longer(cols=c("X", "XS", "US", "XU"), 
+                                names_to = "condition", 
+                                values_to = "log2fc") 
+
+df_ID %>% mutate(condition = factor(condition, levels = (c("XS", "X", "US", "XU"))),
+                 genes = factor(genes,levels = (c("XRN1", "SMG6","UPF1")))) %>% 
+  ggplot(aes(x = condition, y = log2fc, fill = genes))+
+  geom_col(position = "dodge",width = 0.7)+
+  theme_classic() +scale_fill_manual(values = c("#262626", "#8F8F8F", "#D1D1D1"))
+  
+df_ID %>% mutate(condition = factor(condition, levels = rev(c("XS", "X", "US", "XU"))),
+                 genes = factor(genes,levels = (c("XRN1", "SMG6","UPF1"))),
+                 log2fc = ifelse(log2fc>0.5,0.5,log2fc),
+                 log2fc = ifelse(log2fc< -0.5, -0.5, log2fc)) %>% 
+  ggplot(aes(x = condition, fill = log2fc, y = genes))+
+  geom_tile(colour = "white", linewidth = 2)+coord_flip()+
+  theme_classic() +scale_fill_gradient2(low = "#002D72",mid="white", high = "#ffc000")
+
+
+
+# # Remove batch
+# vsd <- vst(dds, blind=FALSE)
+# mat <- assay(vsd)
+# mm <- model.matrix(~ NMDi + tdp, colData(vsd))
+# mat <- limma::removeBatchEffect(mat, batch=vsd$seqDate, design=mm)
+# assay(vsd) <- mat
+# plotPCA(vsd, intgroup="seqDate")
+
+
+```

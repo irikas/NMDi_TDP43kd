@@ -1,0 +1,188 @@
+---
+title: "250624_PathwayEnrichment"
+author: "Irika Sinha"
+date: "2025-06-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is investigate pathway enrichment after TDP-43 knockdown in i3Neurons. We will focus on pathways which include cryptic target genes.
+
+## Packages
+
+```{r packages}
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", 
+                  "ggstats","BiocManager","viridis",
+                  "gghighlight", "ggrepel","pheatmap")
+biocPackages <- c("apeglm", "DESeq2","limma", "biomaRt","fgsea")
+
+for(i in CRANpackages){
+  if(!(i %in% rownames(installed.packages()))){
+    install.packages(pkgs = i)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+for(i in biocPackages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(CRANpackages,biocPackages)
+
+```
+
+## DEG analysis
+Nextflow RNA-seq pipeline used to generate DESeq2 objects.
+Used DESeq2 vignette to write analysis script: https://www.bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
+
+```{r DESeq2}
+# Load data
+load("data/nmdi_all_deseq2.dds.RData")
+cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
+
+# Add metadata
+colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
+colnames(dds@colData)[which(colnames(dds@colData) == "Group2")] = "Rep"
+dds@colData$NMDi = as.factor(c(rep("WT",2),rep("KD",8),rep("WT",4),rep("KD",8)))
+dds@colData$NMDi = factor(dds@colData$NMDi, levels =c("WT","KD"))
+dds@colData$tdp = as.factor(c(rep("WT",12),rep("KD",10)))
+dds@colData$tdp = factor(dds@colData$tdp, levels =c("WT","KD"))
+dds@colData$seqDate = as.factor(c(rep("batch1",10),rep("batch2",12)))
+design(dds) <- ~ tdp + NMDi + seqDate
+
+# Pre-filtering
+dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
+
+
+# DESeq2 Analysis: Subset to WT and TDP-43 KD without NMDi
+# Add experiment design
+# Log fold change shrinkage for visualization and ranking: "apeglm is the adaptive t prior shrinkage estimator from the apeglm package (Zhu, Ibrahim, and Love 2018). As of version 1.28.0, it is the default estimator."
+# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
+dds <- dds[,11:14]
+dds$tdp <- factor(dds$tdp, levels = c("WT","KD"))
+design(dds) <- ~ tdp
+dds <- DESeq(dds)
+# res <- results(dds, contrast=c("tdp","KD","WT"))
+resLFC <- lfcShrink(dds, coef="tdp_KD_vs_WT", type="apeglm")
+df <- resLFC %>% as.data.frame() %>% rownames_to_column(var = "gene") #%>% dplyr::select(gene,log2FoldChange,padj)
+
+# GET GENE NAMES
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+
+gene_names <-getBM(filters= "ensembl_gene_id", 
+                   attributes= c("ensembl_gene_id","external_gene_name","gene_biotype"),
+                   values=df$gene, mart= mart) 
+
+# Add gene names
+df_label <- df %>% inner_join(gene_names %>% 
+                                filter(gene_biotype %in% c("protein_coding","lncRNA")) %>% 
+                                dplyr::select(!c("gene_biotype")),
+                              by = join_by("gene" == "ensembl_gene_id")) %>%
+  relocate(external_gene_name, .before = "gene")
+
+
+# Gene module enrichment (Hallmark)
+# https://stephenturner.github.io/deseq-to-fgsea/
+pathways.hallmark <- gmtPathways("data/h.all.v2025.1.Hs.symbols.gmt")
+
+df_up <- df_label %>% 
+  filter(log2FoldChange > 0)%>%
+  mutate(stat = log2FoldChange/lfcSE) %>%
+  dplyr::select(external_gene_name, stat) %>% 
+  na.omit() %>% 
+  distinct() %>% 
+  group_by(external_gene_name) %>% 
+  summarize(stat=mean(stat)) %>% 
+  filter(external_gene_name != "")
+
+ranks <- deframe(df_up)
+
+fgseaRes_up <- fgsea(pathways=pathways.hallmark, stats=ranks) %>%
+  dplyr::select(-leadingEdge, -ES) %>% 
+  mutate(path_clean = gsub(x=pathway, pattern="HALLMARK_", replacement = ""),
+         path_clean = gsub(x=path_clean, pattern="_", replacement = " ")) %>%
+    mutate(path_clean = str_to_title(path_clean))
+
+fgseaRes_sig_up <- fgseaRes_sig_up %>% filter(padj < 0.05) %>% mutate(genes = pathways.hallmark[pathway])
+fgseaRes_sig_up$genes = apply(fgseaRes_sig_up %>% dplyr::select(genes), 
+                           MARGIN = 1,
+                           FUN = function(x) str_c(x[[1]], collapse=","))
+fgseaRes_sig_up$cryptic = NA
+
+for(i in 1:nrow(fgseaRes_sig_up)){
+  cryptic = which(str_detect(string = fgseaRes_sig_up$genes[i], pattern=unique(cryptic_df$`Gene Symbol`)))
+  cryptic = (unique(cryptic_df$`Gene Symbol`))[cryptic]
+  fgseaRes_sig_up$cryptic[i] = str_c(cryptic, collapse = ",")
+}
+
+# Down
+df_down <- df_label %>% 
+  filter(log2FoldChange < 0)%>%
+  mutate(stat = log2FoldChange/lfcSE) %>%
+  dplyr::select(external_gene_name, stat) %>% 
+  na.omit() %>% 
+  distinct() %>% 
+  group_by(external_gene_name) %>% 
+  summarize(stat=mean(stat)) %>% 
+  filter(external_gene_name != "")
+
+ranks <- deframe(df_down)
+
+fgseaRes_down <- fgsea(pathways=pathways.hallmark, stats=ranks) %>%
+  dplyr::select(-leadingEdge, -ES) %>% 
+  mutate(path_clean = gsub(x=pathway, pattern="HALLMARK_", replacement = ""),
+         path_clean = gsub(x=path_clean, pattern="_", replacement = " ")) %>%
+    mutate(path_clean = str_to_title(path_clean))
+
+fgseaRes_sig_d <- fgseaRes_down %>% filter(padj < 0.05) %>% mutate(genes = pathways.hallmark[pathway])
+fgseaRes_sig_d$genes = apply(fgseaRes_sig_d %>% dplyr::select(genes), 
+                           MARGIN = 1,
+                           FUN = function(x) str_c(x[[1]], collapse=","))
+fgseaRes_sig_d$cryptic = NA
+
+for(i in 1:nrow(fgseaRes_sig_d)){
+  cryptic = which(str_detect(string = fgseaRes_sig_d$genes[i], pattern=unique(cryptic_df$`Gene Symbol`)))
+  cryptic = (unique(cryptic_df$`Gene Symbol`))[cryptic]
+  fgseaRes_sig_d$cryptic[i] = str_c(cryptic, collapse = ",")
+}
+
+
+
+
+
+
+order_df <- df_enrichment 
+order_df <- order_df %>% pivot_wider(names_from = genotype, values_from = NES) 
+order_df$order <- apply(order_df[,7:11], 1, function(x) median(x, na.rm=T)) 
+order_HM <- unique((order_df %>% arrange(-order))$path_clean)
+
+df_enrichment %>% mutate(path_clean = factor(path_clean, order_HM)) %>%
+  complete(genotype,path_clean) %>% 
+  mutate(NES = ifelse(is.na(NES), 0, NES)) %>%
+  ggplot(aes(x = genotype, y = path_clean, fill = NES)) +
+  geom_tile(colour = "black") + 
+  theme_classic()+
+  ylab("")+ xlab("")+
+  labs(title="Hallmark Pathways Enrichment (GSEA)") + 
+  theme(axis.text.y = element_text(color="black", family="Helvetica", size =15),
+        axis.text.x = element_text(angle = 30, hjust=1,
+                                   color="black", family="Helvetica", size =15), 
+        axis.line = element_blank(), axis.ticks = element_blank(),
+        title = element_text(size = 10))+
+  scale_fill_gradient2(low="#364b9a",mid = "white",high = "#a50026",
+                       na.value = "#444444", midpoint=0)
+
+
+
+```

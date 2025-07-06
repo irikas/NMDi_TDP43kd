@@ -16,8 +16,8 @@ The purpose of this script is to determine the location of UG repeats near crypt
 ## Packages
 
 ```{r packages}
-CRANpackages <- c("tidyverse", "XML","ggplot2", "ggpubr", "ggstats","BiocManager","viridis", "gghighlight")
-biocPackages <- c("Biostrings","biomaRt")
+CRANpackages <- c("tidyverse", "XML","ggplot2", "ggpubr", "ggstats","BiocManager","viridis", "gghighlight","ggridges")
+biocPackages <- c("Biostrings","biomaRt","UCSCRepeatMasker","AnnotationHub")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -146,7 +146,7 @@ return(str_flatten(testseq_num))
 ```
 
 ```{r seq, eval=F}
-cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
 cryptic_df_coord <- cryptic_df[,c(1:4,6,18,19)] %>% mutate(leftRegion = NA,
                                                          rightRegion = NA)
 
@@ -189,8 +189,8 @@ cryptic_df_coord$urlR[which(is.na(cryptic_df_coord$RightJunction))] = NA
 
 
 
-# write_delim(cryptic_df_coord[,9], "output_tables/250411_cryptic_df_coord_left.txt", col_names = F)
-# write_delim(cryptic_df_coord[,10], "output_tables/250411_cryptic_df_coord_right.txt", col_names = F)
+# write_delim(cryptic_df_coord[,9], "output_tables/250602_cryptic_df_coord_left.txt", col_names = F)
+# write_delim(cryptic_df_coord[,10], "output_tables/250602_cryptic_df_coord_right.txt", col_names = F)
 ```
 
 
@@ -235,13 +235,13 @@ for(i in 1:nrow(cryptic_df_coord)){
   rm(j,i,xmlF,seq)
 }
 
-# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_seqFill.csv")
+# write.csv(cryptic_df_coord,"output_tables/250602_cryptic_df_coord_seqFill.csv")
 
 ```
 
 ## Determine correct strand
 ```{r strand}
-cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_seqFill.csv")[-1]
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_seqFill.csv")[-1]
 
 ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
 biomart_CE <- getBM(attributes=c("external_gene_name",'ensembl_gene_id','strand'),
@@ -281,20 +281,20 @@ for(i in 1:nrow(cryptic_df_coord)){
 }
 
 
-# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_seq_strand.csv")
+# write.csv(cryptic_df_coord,"output_tables/250602_cryptic_df_coord_seq_strand.csv")
 ```
 
 ## Use UGrepeat function
 ```{r UGrepeatSeq}
-cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_seq_strand.csv")[-1]
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_seq_strand.csv")[-1]
 
 cryptic_df_coord <- cryptic_df_coord %>% mutate(seqRepL_UG = NA, seqRepR_UG = NA)
 
 cryptic_df_coord$seqRepL_UG <- unlist(lapply(toupper(cryptic_df_coord$seqL),dinucRepeatBinary))
 cryptic_df_coord$seqRepR_UG <- unlist(lapply(toupper(cryptic_df_coord$seqR),dinucRepeatBinary))
 
-# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_UGrepcalc.csv")
-cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_UGrepcalc.csv")[-1]
+# write.csv(cryptic_df_coord,"output_tables/250602_cryptic_df_coord_UGrepcalc.csv")
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_UGrepcalc.csv")[-1]
 
 mathUG_df_L <- data.frame("loc" = -600:50)
 mathUG_df_R <- data.frame("loc" = -50:600)
@@ -315,8 +315,8 @@ for(i in 1:nrow(cryptic_df_coord)){
 mathUG_df_L$avg = apply(mathUG_df_L[,2:ncol(mathUG_df_L)],MARGIN=1,function(x) round(mean(x),3))
 mathUG_df_R$avg = apply(mathUG_df_R[,2:ncol(mathUG_df_R)],MARGIN=1,function(x) round(mean(x),3))
 
-# write.csv(mathUG_df_L, "output_tables/250506_cryptic_df_UG_freq_L.csv")
-# write.csv(mathUG_df_R, "output_tables/250506_cryptic_df_UG_freq_R.csv")
+# write.csv(mathUG_df_L, "output_tables/250602_cryptic_df_UG_freq_L.csv")
+# write.csv(mathUG_df_R, "output_tables/250602_cryptic_df_UG_freq_R.csv")
 
 ggplot(mathUG_df_R, aes(x=loc,y=avg))+
   geom_line(linewidth = 2,colour = "#69140E")+
@@ -338,56 +338,381 @@ ggplot(mathUG_df_L, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E"
 
 ```
 
-## Check CA repeat
-```{r CArepeatSeq}
-cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_UGrepcalc.csv")[-1]
+### Check different types for NMD
+```{r Specifics}
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_UGrepcalc.csv")[-1]
+cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
+nmdInfo <- read_delim("output_tables/250602_NMDinfo.csv")[-c(1,19:54)]
+mathUG_df_L <- read_delim("output_tables/250602_cryptic_df_UG_freq_L.csv")[-1]
+mathUG_df_R <- read_delim("output_tables/250602_cryptic_df_UG_freq_R.csv")[-1]
 
-cryptic_df_coord <- cryptic_df_coord %>% mutate(seqRepL_CA = NA, seqRepR_CA = NA)
+# Create df
+df_loc_L <- data.frame(loc=mathUG_df_L$loc)
+df_loc_R <- data.frame(loc=mathUG_df_R$loc)
 
-cryptic_df_coord$seqRepL_CA <- unlist(lapply(cryptic_df_coord$seqL, function(x) dinucRepeatBinary(x, motif="CA")))
-cryptic_df_coord$seqRepR_CA <- unlist(lapply(cryptic_df_coord$seqR, function(x) dinucRepeatBinary(x, motif="CA")))
+ids <- list("highExp" = (cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10))$`ID #`,
+            "NMD1" = (nmdInfo %>% filter(NMDonly == "1pct" & category == "NMDi"))$`ID #`,
+            "NMD5" = (nmdInfo %>% filter(NMDonly == "5pct" & category == "NMDi"))$`ID #`,
+            "NMD10" = (nmdInfo %>% filter(NMDonly == "10pct" & category == "NMDi"))$`ID #`,
+            "polya" = (cryptic_df %>% filter(type=="polyA"))$`ID #`,
+            "start" = (cryptic_df %>% filter(type=="start site"))$`ID #`,
+            "leaky" = (cryptic_df %>% filter(`LEAKY/Weak`=="Y"))$`ID #`,
+            "inframe" = (cryptic_df %>% filter(`Inf. Ins.`=="Y"))$`ID #`,
+            "noncoding" = (cryptic_df %>% filter(Noncoding=="Y"))$`ID #`,
+            "conserved" = (cryptic_df %>% filter(`Conserved Region`=="Y"))$`ID #`,
+            "cassette" = (cryptic_df %>% filter(type=="cassette"))$`ID #`,
+            "ext" = (cryptic_df %>% filter(type=="exon ext."))$`ID #`)
 
-# write.csv(cryptic_df_coord,"output_tables/250506_cryptic_df_coord_CArepcalc.csv")
-cryptic_df_coord <- read_delim("output_tables/250506_cryptic_df_coord_CArepcalc.csv")[-1]
-
-mathCA_df_L <- data.frame("loc" = -600:50)
-mathCA_df_R <- data.frame("loc" = -50:600)
-
-for(i in 1:nrow(cryptic_df_coord)){
-  if(!is.na(cryptic_df_coord$seqRepL_CA[i])){
-    mathCA_df_L <- cbind(mathCA_df_L, as.numeric(unlist(str_split(cryptic_df_coord$seqRepL_CA[i],""))))
-    colnames(mathCA_df_L)[ncol(mathCA_df_L)] = cryptic_df_coord$`ID #`[i]
-  } 
+for(i in names(ids)){
+  # Isolate relevant CE IDs
+  df_temp <- cryptic_df_coord %>% filter(`ID #` %in% ids[[i]])
+  df_temp_L <- (df_temp %>% filter(!is.na(seqL)))$`ID #`
+  df_temp_R <- (df_temp %>% filter(!is.na(seqR)))$`ID #`
   
-  if(!is.na(cryptic_df_coord$seqRepR_CA[i])){
-    mathCA_df_R <- cbind(mathCA_df_R, as.numeric(unlist(str_split(cryptic_df_coord$seqRepR_CA[i],""))))
-    colnames(mathCA_df_R)[ncol(mathCA_df_R)] = cryptic_df_coord$`ID #`[i]
-  } 
-  rm(i)
+  # Add avg value + Add to data frame for plotting
+  if(i != "start"){
+    df_temp_L <- mathUG_df_L %>% dplyr::select(all_of(c("loc",df_temp_L)))
+    df_temp_L$avg = apply(df_temp_L[,2:ncol(df_temp_L)],MARGIN=1,function(x) round(mean(x),3))
+    
+    df_loc_L$newCol = df_temp_L$avg
+    colnames(df_loc_L)[ncol(df_loc_L)] = i
+  }
+  
+  if(i != "polya"){
+    df_temp_R <- mathUG_df_R %>% dplyr::select(all_of(c("loc",df_temp_R)))
+    df_temp_R$avg = apply(df_temp_R[,2:ncol(df_temp_R)],MARGIN=1,function(x) round(mean(x),3))
+    
+    df_loc_R$newCol = df_temp_R$avg
+    colnames(df_loc_R)[ncol(df_loc_L)] = i
+  }
+
+  # Clean environment
+  rm(i, df_temp, df_temp_L, df_temp_R)
 }
 
-mathCA_df_L$avg = apply(mathCA_df_L[,2:ncol(mathCA_df_L)],MARGIN=1,function(x) round(mean(x),3))
-mathCA_df_R$avg = apply(mathCA_df_R[,2:ncol(mathCA_df_R)],MARGIN=1,function(x) round(mean(x),3))
 
-# write.csv(mathCA_df_L, "output_tables/250506_cryptic_df_CA_freq_L.csv")
-# write.csv(mathCA_df_R, "output_tables/250506_cryptic_df_CA_freq_R.csv")
-
-ggplot(mathCA_df_R, aes(x=loc,y=avg))+
-  geom_line(linewidth = 2,colour = "#69140E")+
+# Plot diff categories
+df_loc_R %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("cassette","ext","start"))) %>% 
+  mutate(type = factor(type, levels = c("cassette","ext","start"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
   theme_classic()+
+  scale_color_manual(values = c("#002D72","#69140E","#82735C"))+
+  facet_wrap(vars(type), scales = "fixed", nrow =3,strip.position = "right")+
   scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
   scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
   theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
         axis.ticks.y = element_blank(),
-        axis.line.y = element_blank())
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
 
-ggplot(mathCA_df_L, aes(x=loc,y=avg))+geom_line(linewidth = 2,colour = "#69140E")+
+df_loc_L %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("cassette","ext","polya"))) %>% 
+  mutate(type = factor(type, levels = c("cassette","ext","polya"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
   theme_classic()+
+  scale_color_manual(values = c("#002D72","#69140E","#CB9F52"))+
+  facet_wrap(vars(type), scales = "fixed", nrow =3,strip.position = "right")+
   scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
   scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
   theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
         axis.ticks.y = element_blank(),
-        axis.line.y = element_blank())
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+# Plot diff NMD
+df_loc_R %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("NMD1","NMD5","NMD10"))) %>% 
+  mutate(type = factor(type, levels = c("NMD1","NMD5","NMD10"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#461220","#b23a48","#fcb9b2"))+
+  facet_wrap(vars(type), scales = "fixed", nrow =3,strip.position = "right")+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+df_loc_L %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("NMD1","NMD5","NMD10"))) %>% 
+  mutate(type = factor(type, levels = c("NMD1","NMD5","NMD10"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#461220","#b23a48","#fcb9b2"))+
+  facet_wrap(vars(type), scales = "fixed", nrow =3,strip.position = "right")+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+
+
+# The Rest
+df_loc_R %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("highExp","leaky","inframe","noncoding","conserved"))) %>% 
+  mutate(type = factor(type, levels = c("conserved", "inframe", "noncoding", "leaky", "highExp"))) %>%
+  ggplot(aes(x=loc,y=avg), color="black")+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  facet_wrap(vars(type), scales = "fixed", nrow =5,strip.position = "right")+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+df_loc_L %>% pivot_longer(cols=2:12, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("highExp","leaky","inframe","noncoding","conserved"))) %>% 
+  mutate(type = factor(type, levels = c("conserved", "inframe", "noncoding", "leaky", "highExp"))) %>%
+  ggplot(aes(x=loc,y=avg), color="black")+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  facet_wrap(vars(type), scales = "fixed", nrow =5,strip.position = "right")+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+for(i in names(ids)){print(paste0(i,":", length((ids[[i]]))))}
+
+# High exp v normal
+df_loc_R %>% mutate(overall = mathUG_df_R$avg) %>% pivot_longer(cols=2:13, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("highExp","overall"))) %>% 
+  mutate(type = factor(type, levels = c("highExp","overall"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#820000","black"))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+df_loc_L %>% mutate(overall = mathUG_df_L$avg) %>% pivot_longer(cols=2:13, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("highExp","overall"))) %>% 
+  mutate(type = factor(type, levels = c("highExp","overall"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#820000","black"))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+# NMD vs overall
+df_loc_R %>% mutate(overall = mathUG_df_R$avg) %>% pivot_longer(cols=2:13, names_to = "type", values_to = "avg") %>%
+  filter((type %in% c("NMD1","overall"))) %>% 
+  mutate(type = factor(type, levels = c("NMD1","overall"))) %>%
+  ggplot(aes(x=loc,y=avg, color=type))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#820000","black"))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0,0.8))+
+  scale_x_continuous(expand=c(0,0),limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+```
+
+## Check other repeats 
+```{r OtherRepeatSeq}
+# Sequences
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_seq_strand.csv")[-1]
+
+cryptic_df_coord <- cryptic_df_coord %>% 
+  mutate("seqRepL_CA" = unlist(lapply(seqL, function(x) dinucRepeatBinary(x, motif="CA"))), 
+         "seqRepR_CA" = unlist(lapply(seqR, function(x) dinucRepeatBinary(x, motif="CA"))),
+         "seqRepL_CG" = unlist(lapply(seqL, function(x) dinucRepeatBinary(x, motif="CG"))), 
+         "seqRepR_CG" = unlist(lapply(seqR, function(x) dinucRepeatBinary(x, motif="CG"))),
+         "seqRepL_UU" = unlist(lapply(seqL, function(x) dinucRepeatBinary(x, motif="UU"))), 
+         "seqRepR_UU" = unlist(lapply(seqR, function(x) dinucRepeatBinary(x, motif="UU"))),
+         "seqRepL_AA" = unlist(lapply(seqL, function(x) dinucRepeatBinary(x, motif="AA"))), 
+         "seqRepR_AA" = unlist(lapply(seqR, function(x) dinucRepeatBinary(x, motif="AA"))))
+beep()
+
+# write.csv(cryptic_df_coord,"output_tables/250602_cryptic_df_coord_otherrepcalc.csv")
+cryptic_df_coord <- read_delim("output_tables/250602_cryptic_df_coord_otherrepcalc.csv")[-1]
+
+math_all_df_L <- data.frame("loc" = -600:50)
+math_all_df_R <- data.frame("loc" = -50:600)
+
+for(i in c("CA","AA","CG","UU")){
+  
+  # Find reference binary col
+  colL = which(str_detect(pattern=paste0("L_",i), string=colnames(cryptic_df_coord)))
+  colR = which(str_detect(pattern=paste0("R_",i), string=colnames(cryptic_df_coord)))
+  
+  # Create empty temp data frame for each repeat
+  df_temp_R <- data.frame("loc" = -600:50)
+  df_temp_L <- data.frame("loc" = -50:600)
+  
+  # Add each temp data frame as column matched to location # 
+  for(j in 1:nrow(cryptic_df_coord)){
+    if(!is.na(cryptic_df_coord$seqL[j])){
+      df_temp_L <- cbind(df_temp_L, as.numeric(unlist(str_split(cryptic_df_coord[j,colL],""))))
+      colnames(df_temp_L)[ncol(df_temp_L)] = cryptic_df_coord$`ID #`[j]
+    } 
+    
+    if(!is.na(cryptic_df_coord$seqR[j])){
+      df_temp_R <- cbind(df_temp_R, as.numeric(unlist(str_split(cryptic_df_coord[j,colR],""))))
+      colnames(df_temp_R)[ncol(df_temp_R)] = cryptic_df_coord$`ID #`[j]
+    }
+  }
+  
+  # Add average at each location to dataframe
+  math_all_df_L <- math_all_df_L %>% 
+    mutate(newCol = apply(df_temp_L[,2:ncol(df_temp_L)],MARGIN=1,function(x) round(mean(x),3)))
+  
+  math_all_df_R <- math_all_df_R %>% 
+    mutate(newCol = apply(df_temp_R[,2:ncol(df_temp_R)],MARGIN=1,function(x) round(mean(x),3)))
+  
+  # Add colnames
+  colnames(math_all_df_L)[ncol(math_all_df_L)] = i
+  colnames(math_all_df_R)[ncol(math_all_df_R)] = i
+  
+  # Clean up
+  rm(colL, colR, df_temp_L, df_temp_R, i)
+}
+
+
+math_all_df_L$UG = mathUG_df_L$avg
+math_all_df_R$UG = mathUG_df_R$avg
+# write.csv(math_all_df_L,"output_tables/250602_math_allRep_df_L.csv")
+# write.csv(math_all_df_R,"output_tables/250602_math_allRep_df_R.csv")
+
+math_all_df_L %>%
+  pivot_longer(cols=2:6, names_to = "rep", values_to = "avg") %>%
+  mutate(rep = factor(rep, levels = c("UG", "CA", "CG","AA","UU"))) %>%
+  ggplot(aes(x=loc,y=avg, color=rep))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#820000", "#3A405A", "#857E61", "#99B2DD", "#F3C677"))+
+  scale_y_continuous(limits = c(0,0.6))+
+  scale_x_continuous(limits = c(-300,50))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+math_all_df_R %>%
+  pivot_longer(cols=2:6, names_to = "rep", values_to = "avg") %>%
+  mutate(rep = factor(rep, levels = c("UG", "CA", "CG","AA","UU"))) %>%
+  ggplot(aes(x=loc,y=avg, color=rep))+
+  geom_line(linewidth = 1)+
+  theme_classic()+
+  scale_color_manual(values = c("#820000", "#3A405A", "#857E61", "#99B2DD", "#F3C677"))+
+  scale_y_continuous(limits = c(0,0.6))+
+  scale_x_continuous(limits = c(-50,300))+
+  theme(text = element_text(size = 14, family = "Helvetica", color="black"), 
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        strip.background = element_rect(color=NA, fill=NA))
+
+
+```
+
+```{r RepeatMasker}
+
+ah <- AnnotationHub()
+rmskhg38 <- ah[["AH111333"]]
+
+regions <- cryptic_df_coord[,c(1:4,8:9,15)] %>% mutate(leftChr = str_split_i(leftRegion,":",1),
+                                             leftStart = str_split_i(str_split_i(leftRegion,":",2),",",1),
+                                             leftEnd = str_split_i(str_split_i(leftRegion,":",2),",",2),
+                                             rightChr = str_split_i(rightRegion,":",1),
+                                             rightStart = str_split_i(str_split_i(rightRegion,":",2),",",1),
+                                             rightEnd = str_split_i(str_split_i(rightRegion,":",2),",",2))
+
+rmskhg38_subset <- data.frame(rmskhg38)[,c(1:3,5,11:13)] %>% filter(seqnames %in% paste0("chr",c(1:22,"X","Y")))
+
+cryptic_df_coord <- cryptic_df_coord %>% mutate(strand = ifelse(strand == "-1", "-","+"))
+
+regions_GrangeL <- regions %>% filter(!is.na(leftRegion))  
+regions_GrangeR <- regions %>% filter(!is.na(rightRegion))  
+
+regions_GrangeL <- GRanges(
+    seqnames = regions_GrangeL$leftChr,
+    ranges = IRanges(start = as.numeric(regions_GrangeL$leftStart), 
+                     end = as.numeric(regions_GrangeL$leftEnd), 
+                     names=regions_GrangeL$`ID #`),
+    strand = regions_GrangeL$strand)
+
+regions_GrangeR <- GRanges(
+    seqnames = regions_GrangeR$rightChr,
+    ranges = IRanges(start = as.numeric(regions_GrangeR$rightStart), 
+                     end = as.numeric(regions_GrangeR$rightEnd), 
+                     names=regions_GrangeR$`ID #`),
+    strand = regions_GrangeR$strand)
+
+L_overlaps <- rmskhg38[(findOverlaps(regions_GrangeL,rmskhg38,minoverlap=3))@to,]
+R_overlaps <- rmskhg38[(findOverlaps(regions_GrangeR,rmskhg38,minoverlap=3))@to,]  
+
+L_overlaps_Name <- data.frame(name = L_overlaps$repName, fam = L_overlaps$repFamily)
+R_overlaps_Name <- data.frame(name = R_overlaps$repName, fam = R_overlaps$repFamily)
+
+sum_Overlaps_Fam <- rbind(L_overlaps_Name,R_overlaps_Name) %>% group_by(fam) %>% summarize(n()) %>%
+  mutate(pct = round(`n()`/421,2)) %>% arrange(-pct)
+
+sum_Overlaps_Fam %>% 
+  mutate(fam = factor(fam, levels = (sum_Overlaps_Fam %>% arrange(`n()`))$fam))  %>% 
+  filter(fam != "Simple_repeat", pct > 0) %>%
+  ggplot(aes(x = fam, y=`n()`)) +
+    geom_col() +
+    theme_classic() +coord_flip()
+
+### High Expressors
+highExp = (cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10))$`ID #`
+regions <- regions %>% filter(`ID #` %in% highExp)
+regions_GrangeL <- regions %>% filter(!is.na(leftRegion))  
+regions_GrangeR <- regions %>% filter(!is.na(rightRegion))  
+
+regions_GrangeL <- GRanges(
+    seqnames = regions_GrangeL$leftChr,
+    ranges = IRanges(start = as.numeric(regions_GrangeL$leftStart), 
+                     end = as.numeric(regions_GrangeL$leftEnd), 
+                     names=regions_GrangeL$`ID #`),
+    strand = regions_GrangeL$strand)
+
+regions_GrangeR <- GRanges(
+    seqnames = regions_GrangeR$rightChr,
+    ranges = IRanges(start = as.numeric(regions_GrangeR$rightStart), 
+                     end = as.numeric(regions_GrangeR$rightEnd), 
+                     names=regions_GrangeR$`ID #`),
+    strand = regions_GrangeR$strand)
+
+L_overlaps <- rmskhg38[(findOverlaps(regions_GrangeL,rmskhg38,minoverlap=3))@to,]
+R_overlaps <- rmskhg38[(findOverlaps(regions_GrangeR,rmskhg38,minoverlap=3))@to,]  
+
+L_overlaps_Name <- data.frame(name = L_overlaps$repName, fam = L_overlaps$repFamily)
+R_overlaps_Name <- data.frame(name = R_overlaps$repName, fam = R_overlaps$repFamily)
+
+sum_Overlaps_Fam <- rbind(L_overlaps_Name,R_overlaps_Name) %>% group_by(fam) %>% summarize(n()) %>%
+  mutate(pct = round(`n()`/421,2)) %>% arrange(-pct)
+
+sum_Overlaps_Fam %>% 
+  mutate(fam = factor(fam, levels = (sum_Overlaps_Fam %>% arrange(`n()`))$fam))  %>% 
+  filter(fam != "Simple_repeat") %>%
+  ggplot(aes(x = fam, y=`n()`)) +
+    geom_col() +
+    theme_classic() +coord_flip()
 
 
 ```

@@ -46,7 +46,7 @@ Used DESeq2 vignette to write analysis script: https://www.bioconductor.org/pack
 ```{r DESeq2}
 # Load data
 load("data/nmdi_all_deseq2.dds.RData")
-cryptic_df = read_delim("output_tables/250506_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
 
 # Add metadata
 colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
@@ -59,7 +59,6 @@ dds@colData$seqDate = as.factor(c(rep("batch1",10),rep("batch2",12)))
 design(dds) <- ~ tdp + NMDi + seqDate
 
 # saveRDS(dds, "data/nmdi_all_annotated_deseq2.dds.RDS")
-# dds <- readRDS("data/nmdi_all_annotated_deseq2.dds.RDS")
 
 # Pre-filtering
 dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
@@ -82,7 +81,7 @@ resLFC <- data.frame(resLFC) %>% filter(!is.na(log2FoldChange)) %>%
 # Use cryptic_df to map CE details to results
 for(i in 1:nrow(cryptic_df)){
   n = which(rownames(resLFC) == cryptic_df$`Ensembl ID`[i])
-  resLFC$geneType[n] = cryptic_df$type[i]
+  resLFC$geneType[n] = cryptic_df$Type[i]
   resLFC$geneName[n] = cryptic_df$`Gene Symbol`[i]
   resLFC$TDPCE[n] = 1-(cryptic_df$maxTDP[i]- cryptic_df$avgT[i])/100
   
@@ -97,7 +96,7 @@ resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 2,geneName,"")) %>%
+                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,geneName,"")) %>%
   ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
@@ -139,7 +138,7 @@ resLFC_adj <- data.frame(resLFC_adj) %>% filter(!is.na(log2FoldChange)) %>%
 
 for(i in 1:nrow(cryptic_df)){
   n = which(rownames(resLFC_adj) == cryptic_df$`Ensembl ID`[i])
-  resLFC_adj$geneType[n] = cryptic_df$type[i]
+  resLFC_adj$geneType[n] = cryptic_df$Type[i]
   resLFC_adj$geneName[n] = cryptic_df$`Gene Symbol`[i]
   rm(i)
 }
@@ -151,7 +150,7 @@ resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & log2FoldChange < -2,geneName,"")) %>%
+                  geneName = ifelse(neglog10p>20 & log2FoldChange < -1,geneName,"")) %>%
   ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
