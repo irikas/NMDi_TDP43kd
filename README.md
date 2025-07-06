@@ -42,10 +42,6 @@
     <td>Confirm gene expression of NMD factors in different conditions</td>
   </tr>
    <tr>
-    <td>250528_GenentechComparison.Rmd</td>
-    <td>Comparison of identified CEs in i3N with Genentech-ID'ed CEs</td>
-  </tr>
-   <tr>
     <td>250604_GTEx.Rmd</td>
     <td>Expression of CE genes across different tissues as measured in GTEx samples. Uses NAUC values from ASCOT.</td>
   </tr>
@@ -81,6 +77,10 @@
   <tr>
     <td>250410_nfcore_RNAseq_pipeline_report.html</td>
     <td>nf-core/RNAseq pipeline info output</td>
+  </tr>
+  <tr>
+    <td>nmdi_all_annotated_deseq2.dds.RDS</td>
+    <td>annotated DESeq2 object</td>
   </tr>
 </table>
 
