@@ -37,6 +37,18 @@
     <td>250506_YY_Rescue.Rmd</td>
     <td>Calculation of survival after shTDP43 + target gene overexpression & visualization</td>
   </tr>
+   <tr>
+    <td>250520_NMD_DGE.Rmd</td>
+    <td>Confirm gene expression of NMD factors in different conditions</td>
+  </tr>
+   <tr>
+    <td>250528_GenentechComparison.Rmd</td>
+    <td>Comparison of identified CEs in i3N with Genentech-ID'ed CEs</td>
+  </tr>
+   <tr>
+    <td>250604_GTEx.Rmd</td>
+    <td>Expression of CE genes across different tissues as measured in GTEx samples. Uses NAUC values from ASCOT.</td>
+  </tr>
 </table>
 <p>*R Markdown document included as html. Download to open properly.</p>
 
