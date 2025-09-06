@@ -18,7 +18,7 @@ The purpose of this script is to confirm knockdown of NMD factors in different c
 
 ```{r packages}
 CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","gghighlight", "ggrepel")
-biocPackages <- c("apeglm", "DESeq2","limma")
+biocPackages <- c("apeglm", "DESeq2","limma", "biomaRt")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -113,5 +113,54 @@ df_ID %>% mutate(condition = factor(condition, levels = rev(c("XS", "X", "US", "
 # assay(vsd) <- mat
 # plotPCA(vsd, intgroup="seqDate")
 
+
+```
+
+### Look at DEGs between UPF1/XRN1 and control!
+For Y.Y.
+```{r upf1}
+# Load data
+load("data/nmdi_all_deseq2.dds.RData")
+
+# Subset to no KDs
+dds <- dds[,1:10]
+
+# Add metadata
+# Add experiment design
+colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
+colnames(dds@colData)[which(colnames(dds@colData) == "Group2")] = "Rep"
+dds@colData$NMDi = as.factor(c(rep("ctrl",2),rep("US",2),rep("X",2),rep("XS",2),rep("XU",2)))
+design(dds) <- ~ NMDi 
+dds$NMDi <- relevel(dds$NMDi, ref = "ctrl")
+
+# Pre-filtering
+dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
+
+# DESeq2 Analysis: All conditions
+# Log fold change shrinkage for visualization and ranking: "apeglm is the adaptive t prior shrinkage estimator from the apeglm package (Zhu, Ibrahim, and Love 2018). As of version 1.28.0, it is the default estimator."
+# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
+dds <- DESeq(dds)
+resXU <- lfcShrink(dds, coef="NMDi_XU_vs_ctrl", type="apeglm")
+
+res <- resXU %>% as.data.frame()
+
+## Use Ensembl database to download gene names
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+
+gene_names <-getBM(filters= "ensembl_gene_id", 
+                   attributes= c("ensembl_gene_id","external_gene_name","gene_biotype"),
+                   values=rownames(dds), mart= mart) 
+
+# Merge with DGEs
+res <- res %>%
+  rownames_to_column("ensembl_gene_id") %>%
+  inner_join(gene_names,
+             by = "ensembl_gene_id") %>%
+  relocate(external_gene_name, .before = "ensembl_gene_id") %>%
+  mutate(external_gene_name = ifelse(external_gene_name == "", ensembl_gene_id, external_gene_name))
+
+# Save
+# write.csv(res, "output_tables/250905_YY_UPF1XRN1kd_vs_Ctrl_DEGs.csv")
 
 ```
