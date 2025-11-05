@@ -163,7 +163,8 @@ done
 # https://icount.readthedocs.io/en/latest/tutorial.html
 # ---------------------------
 
-# Segment genome if necessary
+# Segment genome if necessary 
+# Takes forever
 if [ -e "${GENOME_DIR}/Homo_sapiens.GRCh38.dna.primary_assembly.fa.fai" ]; then 
   if [ -e "${GENOME_DIR}/hs_GRCh38_seg_iCLIP.gtf.gz" ]; then 
     echo "genome segmenting for iCount complete" 
@@ -182,19 +183,20 @@ cd $OUT_DIR/iCount
 for file in *_cDNA_unique.bed; do \
   singularity exec $SING_IMAGES/icount.sif iCount peaks $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz \
   $file ${file%_cDNA_unique.bed}_peaks.bed \
---scores ${file%_cDNA_unique.bed}_scores.tsv
+  --scores ${file%_cDNA_unique.bed}_scores.tsv
 done
 
 # Identifying clusters of significantly cross-linked sites
+# Note: tutorial missing positional argument 1
 for file in *_peaks.bed; do \
-  singularity exec $SING_IMAGES/icount.sif iCount clusters $file ${file%_peaks.bed}_clusters.bed
+  singularity exec $SING_IMAGES/icount.sif iCount clusters ${file%_peaks.bed}_cDNA_unique.bed $file ${file%_peaks.bed}_clusters.bed
 done
 
 # Annotating sites and summary statistics
 for file in *_cDNA_unique.bed; do \
-  singularity exec $SING_IMAGES/icount.sif annotate $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_annotated_sites_biotype.tab
-  singularity exec $SING_IMAGES/icount.sif annotate --subtype gene_id $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_annotated_sites_genes.tab
-  singularity exec $SING_IMAGES/icount.sif summary $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_summary.tab $GENOME_DIR/Homo_sapiens.GRCh38.dna.primary_assembly.fa.fai
+  singularity exec $SING_IMAGES/icount.sif iCount annotate $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_annotated_sites_biotype.tab
+  singularity exec $SING_IMAGES/icount.sif iCount annotate --subtype gene_id $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_annotated_sites_genes.tab
+  singularity exec $SING_IMAGES/icount.sif iCount summary $GENOME_DIR/hs_GRCh38_seg_iCLIP.gtf.gz $file ${file%_cDNA_unique.bed}_summary.tab $GENOME_DIR/Homo_sapiens.GRCh38.dna.primary_assembly.fa.fai
 done
 
 # ---------------------------
