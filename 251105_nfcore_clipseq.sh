@@ -3,8 +3,8 @@
 #SBATCH --job-name=eclip_tdp43
 #SBATCH --time=72:00:00
 #SBATCH --partition=parallel
-#SBATCH --ntasks=12
-#SBATCH --mem-per-cpu=100GB
+#SBATCH --ntasks=30
+#SBATCH --mem=150G
 
 # ---------------------------
 # Define variables
