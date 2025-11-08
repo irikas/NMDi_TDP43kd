@@ -25,6 +25,7 @@ ml load Java/11.0.2 singularity/3.8.7
 # Run nf-core/clipseq
 # GRCh37 bc this version of iCount is not compatible with GRCh38
 # ---------------------------
+cd $MAIN_DIR/input
 
 for file in 251106_*; do \
   fName=${file##251106_eclip_design_}
