@@ -1,0 +1,168 @@
+---
+title: "251117_qPCR"
+author: "Irika Sinha"
+date: "2025-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library("BiocManager")
+packages <- c("tidyverse", "ggrepel","viridis", "ggridges", "pheatmap","readxl")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  } else{
+    BiocManager::install(pkgs = i, ask = F, update=T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+## Data analysis
+-KALRN #7-21 & #7-22 were not amplified (no primer added)
+
+```{r DataQC}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+data <- read_csv("data/251117_qPCR_data.csv") %>% 
+  filter(!is.na(Primers)) 
+shRNA_key <- read_xlsx("data/250904_NMD_RNA.xlsx", sheet = 2) %>% 
+  dplyr::select(gene, `RNA ID#`, shRNA)
+  
+## Test for primer failure?
+## Couple with multiple peaks - perhaps re-test primers
+m <- as.matrix(table(paste0(data$Target[which(!is.na(data$Tm2))], " KD"),data$Primers[which(!is.na(data$Tm2))]))
+pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
+
+m <- as.matrix(table(paste0(data$Target[which(!is.na(data$Tm3))], " KD"),data$Primers[which(!is.na(data$Tm3))]))
+pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
+
+## Remove failed experiments
+data <- data %>% filter(CT != "Undetermined", !(SampleID %in% c("#7-21", "#7-22"))) %>%
+  left_join(shRNA_key, by = join_by(SampleID == `RNA ID#`, Target == gene))
+
+## Calculate average CT and sd of CT
+data_grouped <- data %>% group_by(Target,shRNA, SampleID, Primers) %>% 
+  summarize(ct1 = as.numeric(list(CT)[1][[1]][1]), ct2=as.numeric(list(CT)[1][[1]][2]),
+            ct_diff=abs(as.numeric(list(CT)[1][[1]][1])-as.numeric(list(CT)[1][[1]][2])),
+            avgCT = round(mean(as.numeric(CT)),2), 
+            sdCT = round(sd(as.numeric(CT)), 2))
+
+data_grouped %>% mutate(key = paste0(Target, "_", shRNA)) %>% 
+  filter(Target != "TARDBP") %>%
+  ggplot(aes(x=key, y=Primers, fill=sdCT)) +
+  geom_tile(color="black")  + 
+  scale_fill_viridis(option = "B")+ xlab("KDTarget_shRNA")+
+  theme_classic() + ylab("STDEV of CT")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.ticks = element_blank(),
+        axis.line = element_blank()) +
+  scale_x_discrete(expand=c(0,0)) + 
+  scale_y_discrete(expand=c(0,0))
+
+data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
+  filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
+  ggplot(aes(x=key, y = ct_diff, fill = Primers))+
+  geom_col(position = "dodge")+
+  scale_fill_viridis(option = "B", discrete=T, begin = 0, end = 0.8, name="Primers")+
+  xlab("KDTarget_shRNA")+theme_classic() + ylab("CT Difference for Duplicates")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  scale_x_discrete(expand=c(0,0)) + 
+  scale_y_continuous(expand=c(0,0), lim=c(0,6)) +
+  geom_hline(yintercept = 0.5, linetype="dotted")
+
+data_grouped %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
+  ggplot(aes(x=Primers, y = ct_diff, fill = SampleID))+
+  geom_col(position = "dodge")+
+  scale_fill_viridis(option = "B", discrete=T, begin = 0, end = 0.8, name="Sample")+
+  xlab("Primers")+theme_classic() + ylab("CT Difference for Duplicates")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  scale_x_discrete(expand=c(0,0)) + 
+  scale_y_continuous(expand=c(0,0), lim=c(0,1)) +
+  geom_hline(yintercept = 0.5, linetype="dotted")
+  
+data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
+  filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
+  ggplot(aes(x=ct1, y = ct2, color = Primers))+
+  geom_point(size=3, alpha=0.8)+theme_classic()+
+  scale_color_viridis(option = "B", discrete=T, begin = 0, end = 0.8, name="Primers")+
+  geom_abline(slope=1, intercept=-0.5, linetype="dotted")+
+  geom_abline(slope=1, intercept=0.5, linetype="dotted")+
+  geom_text_repel(aes(label=ifelse(ct_diff>0.5,SampleID,"")),
+                  size=3,min.segment.length = 0,
+                  max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")
+potentialRedos <- (data_grouped %>% filter(ct_diff > 0.5))$SampleID
+
+## Calculate -ddCT for okay samples
+calculate_df_Ctrl <- data_grouped %>% 
+  filter(SampleID == "Ctrl") %>% ungroup() %>%
+  mutate(GAPDH = data_grouped$avgCT[480],
+         TARDBP = data_grouped$avgCT[497],
+         Ctrl_dCT_Target = as.numeric(avgCT)-as.numeric(GAPDH),
+         Ctrl_dCT_TDP = as.numeric(TARDBP)-as.numeric(GAPDH)) %>%
+  dplyr::select(!c(Target,shRNA, ct1,ct2,ct_diff,sdCT, avgCT, GAPDH, TARDBP, SampleID))
+
+calculate_df_TDP43KD <- data_grouped %>% 
+  filter(SampleID == "TARDBP_KD" & Primers %in% unique(data_grouped$Target[-which(data_grouped$SampleID %in% potentialRedos)])[-43]) %>% ungroup() %>%
+  left_join(calculate_df_Ctrl, by = "Primers") %>%
+    mutate(GAPDH = data_grouped$avgCT[which(data_grouped$SampleID == "TARDBP_KD" & data_grouped$Primers == "GAPDH")],
+         TDPKD_dCT_Target = as.numeric(avgCT)-as.numeric(GAPDH),
+         ddCT_TDPKD_Target = TDPKD_dCT_Target - Ctrl_dCT_Target,
+         relTarget_TDPKD = round(2^(-1*ddCT_TDPKD_Target),3)) 
+
+calculate_df_kds <- data_grouped %>% 
+  filter(!(SampleID %in% c(potentialRedos,"TARDBP_KD", "Ctrl"))) %>%
+  rename(KD=Target) %>%
+  dplyr::select(!c(ct1,ct2,ct_diff,sdCT)) %>%
+  pivot_wider(names_from = (Primers), values_from = avgCT) %>%
+  left_join(calculate_df_Ctrl, by = join_by(KD == Primers)) %>%
+    mutate(dCT_Target = as.numeric(Target)-as.numeric(GAPDH),
+         dCT_TDP = as.numeric(TARDBP)-as.numeric(GAPDH),
+         ddCT_Target = dCT_Target - Ctrl_dCT_Target,
+         ddCT_TARDBP = dCT_TDP - Ctrl_dCT_TDP,
+         relTarget = round(2^(-1*ddCT_Target),3),
+         relTDP43 = round(2^(-1*ddCT_TARDBP),3)) %>%
+  ungroup() %>%
+  add_row(KD = calculate_df_TDP43KD$Primers, shRNA = "shTARDBP",
+          Ctrl_dCT_Target = calculate_df_TDP43KD$Ctrl_dCT_Target,
+          dCT_Target = calculate_df_TDP43KD$TDPKD_dCT_Target,
+          ddCT_Target = calculate_df_TDP43KD$ddCT_TDPKD_Target,
+          relTarget = calculate_df_TDP43KD$relTarget_TDPKD) %>%
+  mutate(color = ifelse(shRNA == "shTARDBP", "red", "black"))
+
+tdpKDintercept <- data.frame(KD = calculate_df_TDP43KD$Primers, Val = calculate_df_TDP43KD$relTarget_TDPKD)
+
+calculate_df_kds %>% 
+  mutate(key = paste0(KD, "\n", shRNA)) %>%
+  filter(!is.na(Ctrl_dCT_Target))%>%
+  ggplot(aes(x = key, y = relTarget)) +
+  geom_hline(data = tdpKDintercept, aes(yintercept = Val), linetype="dotted", color = "red", linewidth=1)+
+  geom_boxplot(outliers = F, alpha=0.5)+
+  geom_jitter(aes(color = color), size = 3, alpha = 0.6,height=0)+
+  theme_classic() + scale_color_manual(values = c("black", "red")) + 
+  scale_y_continuous(lim=c(0,2.4), expand=c(0,0))+
+  xlab("")+ylab("Relative Expression of Target (2^-ddCT)")+
+  facet_wrap(vars(KD), scales = "free_x", ncol=13)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        panel.border = element_rect(color="black"),
+        strip.background = element_rect(fill="#B0DAF1", color="#B0DAF1"),
+        strip.text = element_text(face="bold"),
+        legend.position = "none")
+
+
+
+
+```
