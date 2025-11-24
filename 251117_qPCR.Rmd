@@ -40,6 +40,7 @@ setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/
 data <- read_csv("data/251117_qPCR_data.csv") %>% 
   filter(!is.na(Primers)) 
 shRNA_key <- read_xlsx("data/250904_NMD_RNA.xlsx", sheet = 2) %>% 
+  filter(RNAisolate == "Y")%>% 
   dplyr::select(gene, `RNA ID#`, shRNA)
   
 ## Test for primer failure?
