@@ -15,10 +15,12 @@ The purpose of this script is use SnapMine to check PSIs of CEs in public RNA-Se
 
 ## Packages
 
+SnapMine package is still in development but is functional. It can be downloaded from GitHub.
+
 ```{r packages, message = FALSE, warning = FALSE}
 update.packages("BiocManager")
 library("BiocManager")
-packages <- c("tidyverse","ggplot2")
+packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -32,6 +34,10 @@ for(i in packages){
 
 rm(packages)
 
+## Install SnapMine package from GitHub
+remotes::install_github("irikas/SnapMine_Paper", subdir = "snapmine")
+library(snapmine)
+
 ## List Package Versions
 versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
 data.frame(versions)
@@ -39,167 +45,50 @@ rm(versions)
 
 ```
 
-## Import SnapMine functions
-As per 11/26/2025 version
-```{r Functions}
+## Load files and run Snaptron query
+Copied from introduction vignette!
 
-#Define functions
+```{r files, eval=T}
+## Load df
+df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/data/251126_CEdf.csv")
 
-#Name: regExSamples
-#Purpose: Reformat samples column of Snaptron junction table in order to create new dataframe with 1 column of rail_ids and 1 column of counts
-regExSamples <- function(df){
-  #create df for samples + count
-  allSamples <- df$samples
-  allSamples<- unlist(strsplit(allSamples,",")) #separate character into string of characters
-  allSamples <- allSamples[allSamples!=""] #remove blank samples
-  
-  #RegEx information: https://www.journaldev.com/36776/regular-expressions-in-r
-  sampleID <- gsub(":[^:]+$","",allSamples) #replace everything after and including colon with nothing
-  sampleCount <- gsub("^[^:]+:", "",allSamples) #replace everything before and including colon with nothing
-  sampleCount <- as.numeric(sampleCount)
-  sampleDF <- data.frame(sampleID, sampleCount)
-  colnames(sampleDF)=c("sampleID","junctionCount")
-  
-  return(sampleDF)
-}
+## Original df did not have strand info so need to use biomaRt
+## Update df
+mart <- useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+info <- getBM(attributes = c("ensembl_gene_id", "strand"), values = df$`Ensembl ID`, mart = mart)
+df <- df %>%
+  left_join(info, by = join_by(`Ensembl ID` == ensembl_gene_id)) %>%
+  mutate(strand = ifelse(strand == 1, "+", "-"))
+rm(mart, info)
 
-
-#Name: calcPSI
-#Purpose: Given junction inclusion and exclusion coordinates and genome, create a dataframe which includes the inclusion and exclusion junction counts and inclusion junction PSI(s) for each sample with counts of either. Can calculate either one or two inclusion junctions with the same exclusion junction. Requires regExSamples function.
-calcPSI <- function(chr,incA,incB,incC = NA,incD = NA,excA,excD,genome, totalCountMin = 15){
-  #Download snaptron junction info around region bounded by exclusion junction
-  url <- paste0("https://snaptron.cs.jhu.edu/",genome,"/snaptron?regions=chr",
-                chr,":",excA-100,"-",excD + 100)
-  options(timeout=300)
-  snaptronQuery <- read.csv(url, sep="\t",quote = "")
-  
-  #Create Count DFs
-  if(!is.na(incC) & !is.na(incD)){
-    junctions <- list(inc1 = c(incA,incB), 
-                      inc2 = c(incC, incD),
-                      exc = c(excA, excD))
-    
-    for(i in 1:3){
-      junctionRow <- which(snaptronQuery$start==junctions[[i]][1] & snaptronQuery$end==junctions[[i]][2]) #determine relevant row in Snaptron file
-      junctionDF <- snaptronQuery[junctionRow,]
-      junctionDF <- regExSamples(junctionDF)
-      colnames(junctionDF)[2] = paste0(names(junctions)[i],"_count")
-      assign(paste0(names(junctions)[i],"_count"),junctionDF)
-    }
-    
-    countdf <- merge(inc1_count,inc2_count,sort = T, all = T) #include all samples
-    countdf <- merge(countdf,exc_count,sort = T, all = T) #include all samples
-    countdf[is.na(countdf)] = 0 #any junctions with no counts of a type will be set to 0
-    
-    #Add PSI values
-    countdf <- countdf %>% mutate(totalExonInc1 = inc1_count + exc_count) %>% mutate(PSI_Inc1 = inc1_count/totalExonInc1)
-    countdf <- countdf %>% mutate(totalExonInc2 = inc2_count + exc_count) %>% mutate(PSI_Inc2 = inc2_count/totalExonInc2)
-    countdf$PSI_Inc1 <- round(countdf$PSI_Inc1*100,2)
-    countdf$PSI_Inc2 <- round(countdf$PSI_Inc2*100,2)
-    
-    #Set PSI to NA if not enough counts of junction to indicate real measurements
-    countdf$PSI_Inc1[which(countdf$totalExonInc1 < totalCountMin)] = 0
-    countdf$PSI_Inc2[which(countdf$totalExonInc2 < totalCountMin)] = 0
-    
-    #Generate average
-    countdf <- countdf %>% mutate(avgPSI = rowMeans(select(countdf, c(PSI_Inc1,PSI_Inc2)), na.rm = TRUE))
-    
-    #rename sampleID columns to numeric
-    countdf$sampleID <- as.numeric(countdf$sampleID)
-    
-  } else{
-    junctions <- list(inc1 = c(incA,incB), 
-                      exc = c(excA, excD))
-    
-    for(i in 1:2){
-      junctionRow <- which(snaptronQuery$start==junctions[[i]][1] & snaptronQuery$end==junctions[[i]][2]) #determine relevant row in Snaptron file
-      junctionDF <- snaptronQuery[junctionRow,]
-      junctionDF <- regExSamples(junctionDF)
-      colnames(junctionDF)[2] = paste0(names(junctions)[i],"_count")
-      assign(paste0(names(junctions)[i],"_count"),junctionDF)
-    }
-    
-    countdf <- merge(inc1_count,exc_count,sort = T, all = T) #include all samples
-    countdf[is.na(countdf)] = 0 #any junctions with no counts of a type will be set to 0
-    
-    #Add PSI values
-    countdf <- countdf %>% mutate(totalExonInc1 = inc1_count + exc_count) %>% mutate(PSI_Inc1 = inc1_count/totalExonInc1)
-    countdf$PSI_Inc1 <- round(countdf$PSI_Inc1*100,2)
-    
-    #Set PSI to NA if not enough counts of junction to indicate real measurements
-    countdf$PSI_Inc1[which(countdf$totalExonInc1 < totalCountMin)] = NA
-    countdf$avgPSI = countdf$PSI_Inc1
-    
-    #rename sampleID columns to numeric
-    countdf$sampleID <- as.numeric(countdf$sampleID)
-  }
-  
-  return(countdf)
-}
-
-#Name: samplesInfo
-#Purpose: Use lazy reading to only import sample metadata for the samples identified with inclusion > 15. Requires sampleIDs from output dataframe of calcPSIs but could also just call metadata for a random string of rail_ids if desired.
-samplesInfo <- function(genome, sampleIDs){
-  #Download samples to local folder: "curl https://snaptron.cs.jhu.edu/data/srav1m/samples.tsv >srav1m_samples.tsv"
-  fname <- paste0(genome, "_samples.tsv")
-  sampleInfo <- read_tsv(fname, lazy = TRUE,quote = "")
-  sampleInfo <- sampleInfo %>% select(c("rail_id","external_id","study","study_title",
-                                        "library_layout","sample_description","study_abstract",
-                                        "study_description","sample_name","sample_title")) %>% filter(rail_id %in% sampleIDs) 
-  return(sampleInfo)
-}
+## Create info_df file
+info_df <- data.frame(
+  novel_junc_id = paste(df$`Gene Symbol`, df$`ID #`, sep = "_"),
+  compilation = "sra_human",
+  strand = df$strand,
+  novel_junc_left_coord = df$LeftJunction,
+  novel_junc_right_coord = df$RightJunction,
+  canon_junc_coord = df$`Canonical Splice Junction`
+)
 ```
 
-```{r RunSnapMine}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
-cryptic_df = read_delim("data/251126_CEdf.csv", 
-                        col_select = c(`Gene Symbol`, `ID #`, 
-                                       `Canonical Splice Junction`, 
-                                       `LeftJunction`, `RightJunction`)) %>%
-  mutate(LeftJunction = str_split_i(LeftJunction,":",2),
-         RightJunction = str_split_i(RightJunction,":",2),
-         canon = str_split_i(`Canonical Splice Junction`,":",2))
-
-
-info <- data.frame(gene = paste(cryptic_df$`Gene Symbol`,cryptic_df$`ID #`, sep="_"),
-                   chr=str_remove(str_split_i(cryptic_df$`Canonical Splice Junction`,":",1),"chr"),
-                   incA = as.numeric(str_split_i(cryptic_df$LeftJunction,"-",1)),
-                   incB = as.numeric(str_split_i(cryptic_df$LeftJunction,"-",2)),
-                   incC = as.numeric(str_split_i(cryptic_df$RightJunction,"-",1)),
-                   incD = as.numeric(str_split_i(cryptic_df$RightJunction,"-",2)),
-                   excA = as.numeric(str_split_i(cryptic_df$canon,"-",1)),
-                   excD = as.numeric(str_split_i(cryptic_df$canon,"-",2))) %>%
-  mutate(chr = ifelse(chr %in% c("X","Y"), chr, as.numeric(chr)))
-
-
-
-df <- data.frame("sampleID"=matrix(ncol = 1, nrow = 0))
-
-for(i in 1:nrow(info)){
-  dftemp <- calcPSI(chr = info$chr[i], 
-                    incA = info$incA[i], incB = info$incB[i],
-                    incC = info$incC[i], incD = info$incD[i], 
-                    excA = info$excA[i], excD = info$excD[i], 
-                    genome = "srav3h", totalCountMin = 0)
-  dftemp <- dftemp %>% select(sampleID,starts_with("PSI"),ends_with("PSI")) %>% mutate_all(~ifelse(is.nan(.), NA, .))
-  colnames(dftemp)[2:ncol(dftemp)] = paste0(info$gene[i],"__",colnames(dftemp)[2:ncol(dftemp)])
-  
-  df <- merge(df, dftemp,all = T)
-  print(i)
-  rm(dftemp,i)
-}
-
-
-
-df <- df %>% mutate(avgbothJunc_rmNA = rowMeans(select(df, ends_with("PSI")), na.rm = TRUE)) %>%
-  mutate(avgJunc_rmNA = rowMeans(select(df, contains("PSI_Inc")), na.rm = TRUE)) 
-
-#%>%dplyr::select(!contains("Inc",ignore.case = ))
-
-
-# saveRDS(df,"output_tables/251126_df_SnapMine.RDS")
-
-df2 <- df %>% mutate(NAcount = rowSums(df %>% is.na)) %>% filter(NAcount != 423)
-
-
+```{r query, eval = F}
+## Run query
+# Run twice for long and wide dfs.
+# Could also run without flattening - this would lead to a list of dfs and then both flatten functions could be done manually using [flatten_counts]
+result_df_long <- calcPSI_bulk(info_df, flatten_long = T)
+result_df_wide <- calcPSI_bulk(info_df, flatten_wide = T)
+# saveRDS(result_df_long, "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/output_tables/251204_snapmine_results.RDS")
+# saveRDS(result_df_wide, "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/output_tables/251204_snapmine_result_df_wide.RDS")
 ```
+
+```{r load_df, include = F}
+result_df_long <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/output_tables/251204_snapmine_results.RDS")
+result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/output_tables/251204_snapmine_result_df_wide.RDS")
+```
+
+## Visualize CE inclusion
+
+```{r Visual}
+```
+
