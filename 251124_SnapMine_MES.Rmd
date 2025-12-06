@@ -20,7 +20,7 @@ SnapMine package is still in development but is functional. It can be downloaded
 ```{r packages, message = FALSE, warning = FALSE}
 update.packages("BiocManager")
 library("BiocManager")
-packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap")
+packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap","viridis")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -90,5 +90,159 @@ result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopki
 ## Visualize CE inclusion
 
 ```{r Visual}
+result_df_wide[is.na(result_df_wide)] = 0
+
+## Subset to samples with avgPSI > 15 for at least one CE
+result_df_wide_subset <- result_df_wide %>% 
+  mutate(maxPSI = apply(result_df_wide[, -1],
+                        MARGIN = 1, function(x) max(x, na.rm = T))) %>%
+  filter(maxPSI > 5) %>% dplyr::select(-maxPSI) 
+
+## Subset to avgPSI > 5 for at least 10% tested CEs
+result_df_wide_subset_overall <- result_df_wide_subset%>%
+  mutate(n5 = apply(result_df_wide_subset[, -1],
+                     MARGIN = 1,
+                     function(x) length(which(x > 5)))) %>%
+  filter(n5 > round(0.10 * nrow(info_df), 0)) %>%
+  dplyr::select(-n5) %>%
+  column_to_rownames(var = "sampleID")
+
+m.results <- as.matrix(result_df_wide_subset_overall)
+pheatmap(m.results, show_rownames = F, fontsize = 10,
+         color = viridis(100,option="B"))
+
+## Remove CEs with no values higher than 5%
+colKeep <- apply(X = result_df_wide_subset_overall, MARGIN = 2, FUN = function(x) max(x) > 15)
+result_df_wide_subset_overall_CEsubset <- result_df_wide_subset_overall[,colKeep]
+
+pheatmap(as.matrix(result_df_wide_subset_overall_CEsubset), show_rownames = F, fontsize = 8,
+        color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100))
+
+# CE with medium-high inclusion
+## Subset to avgPSI > 15 for at least 20
+result_df_TDPneg <- result_df_wide_subset_overall%>%
+  mutate(n5 = apply(result_df_wide_subset_overall,
+                     MARGIN = 1,
+                     function(x) length(which(x > 15)))) %>%
+  filter(n5 > 20) %>%
+  dplyr::select(-n5) 
+
+colKeep <- apply(X = result_df_TDPneg, MARGIN = 2, FUN = function(x) max(x) > 50)
+result_df_TDPneg <- result_df_TDPneg[,colKeep]
+pheatmap(as.matrix(result_df_TDPneg), 
+         #show_rownames = F, 
+         fontsize = 8,
+        color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100))
+
+
+# Samples with high CE inclusion
+## Subset to avgPSI > 20 for at least 42 targets
+## Subset to CEs within those samples with a max inclusion greater than 50
+result_df_TDPneg <- result_df_wide_subset_overall%>%
+  mutate(n5 = apply(result_df_wide_subset_overall,
+                     MARGIN = 1,
+                     function(x) length(which(x > 15)))) %>%
+  filter(n5 > 42) %>%
+  dplyr::select(-n5) 
+
+colKeep <- apply(X = result_df_TDPneg, MARGIN = 2, FUN = function(x) max(x) > 50)
+result_df_TDPneg <- result_df_TDPneg[,colKeep]
+
+samples <- data.frame(sampleID = rownames(result_df_TDPneg))
+sampleMeta <- snapmine::add_SnaptronMeta(samples, compilation = "sra_human") %>%
+  mutate(rail_id = as.character(rail_id))
+samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id"))
+
+#manual
+rowAnn = data.frame(sampleID = samples$sampleID,
+                    Condition = c(rep("HeLa SMG6/7KD UPF1 CLIP",2),
+                                   rep("MDA-MB231 shTDP43/shSRSF3",2),
+                                   "HeLa shUPF1",
+                                   "hMN siTDP-43",
+                                   rep("MRC-5 MERS-CoV",5))) %>%
+  column_to_rownames("sampleID")
+
+
+pheatmap(as.matrix(result_df_TDPneg), 
+         show_rownames = T, 
+         fontsize = 12,
+         color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100),
+         border_color = "white",
+         annotation_row = rowAnn,
+         annotation_colors = list(Condition = 
+                                    c(`HeLa SMG6/7KD UPF1 CLIP` = "#788AA3",
+                                      `MDA-MB231 shTDP43/shSRSF3` = "#C83E4D",
+                                      `HeLa shUPF1` = "#FFCF99",
+                                      `hMN siTDP-43` = "#C83E4D",
+                                      `MRC-5 MERS-CoV` = "#302F4D")))
+
+# Samples with high CE inclusion
+## Subset to avgPSI > 5 for at least 20% targets
+## Subset to CEs within those samples with a max inclusion greater than 20
+result_df_TDPneg <- result_df_wide_subset_overall%>%
+  mutate(n5 = apply(result_df_wide_subset_overall,
+                     MARGIN = 1,
+                     function(x) length(which(x > 5)))) %>%
+  filter(n5 > (0.2*423)) %>%
+  dplyr::select(-n5) 
+
+colKeep <- (apply(result_df_TDPneg,
+                     MARGIN = 2,
+                     function(x) length(which(x > 20)))>(0.5*nrow(result_df_TDPneg)))
+
+result_df_TDPneg <- result_df_TDPneg[,colKeep]
+
+samples <- data.frame(sampleID = rownames(result_df_TDPneg))
+sampleMeta <- snapmine::add_SnaptronMeta(samples, compilation = "sra_human") %>%
+  mutate(rail_id = as.character(rail_id))
+samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id"))
+
+#manual
+rowAnn = data.frame(sampleID = samples$sampleID,
+                    Detail = c(rep("HeLa SMG6/7KD - UPF1 CLIP",2),
+                                  "HeLa SMG6/7KD + SMG7 rescue - UPF1 CLIP",
+                                  "MCF-7 mRNA",
+                                   rep("MDA-MB231 shTDP43/shSRSF3",2),
+                                  rep("hMN siTDP-43",2),
+                                  "HeLa NBT",
+                                  "DLPFC 3M",
+                                  "A-172 + TN Drosha miRNA-seq",
+                                  rep("MRC-5 MERS-CoV",5),
+                                  "MCF-7 mRNA",
+                                  "DLPFC 4M",
+                                   "HeLa shUPF1"
+                                   ),
+                    Condition = c(rep("NMD factor",3),
+                                  "control",
+                                  rep("TDP-43 KD",4),
+                                  "misc",
+                                  "control",
+                                  "misc",
+                                  rep("MERS",5),
+                                  "control",
+                                  "control",
+                                  "NMD factor")) %>%
+  column_to_rownames("sampleID") %>%
+  mutate(Condition = factor(Condition, c("control","TDP-43 KD", "NMD factor", "MERS", "misc")))
+
+rowAnn <- rowAnn %>% dplyr:: select("Condition")
+
+pheatmap(as.matrix(result_df_TDPneg), 
+         show_rownames = T, 
+         fontsize = 12,
+         color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100),
+         border_color = "black",
+         annotation_row = rowAnn,
+         annotation_colors = list(Condition = 
+                                    c(`NMD factor` = "#788AA3",
+                                      `control` = "#FFCF99",
+                                      `TDP-43 KD` = "#C83E4D",
+                                      MERS = "#FFF8F0",
+                                      misc = "#302F4D")))
+
+
+
+
+
 ```
 
