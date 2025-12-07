@@ -239,6 +239,7 @@ pheatmap(as.matrix(result_df_TDPneg),
 df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
 result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_result_df_wide.RDS")
 
+# Find samples in Snaptron that are ALS or TDP-43 related
 Lee_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP185789_Lee_SraRunTable.csv") %>%
   rename(sampleID = SnaptronID)
 HeLa_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP_Hela.csv") %>%
@@ -248,8 +249,8 @@ Patients_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopk
   arrange(SampleTItle)
 result_df_wide[is.na(result_df_wide)] = 0
 
-result_df_wide <- result_df_wide %>% filter(sampleID %in% c(Lee_sampleID$sampleID, HeLa_sampleID$sampleID, hMN_sampleID$sampleID, Patients_sampleID$sampleID)) %>%
-  column_to_rownames("sampleID")
+sampleMeta <- snapmine::add_SnaptronMeta(data.frame(sampleID = rownames(result_df_wide)), compilation = "sra_human") %>%
+  mutate(rail_id = as.character(rail_id))
 
 ## Add CE values from i3N
 ces_kept <- str_split_i(colnames(result_df_wide),"_",2)
@@ -264,12 +265,14 @@ result_df_wide[nrow(result_df_wide)+1,] = ces_kept$`avgPSI_sgTARDBP_shXRN1/shUPF
 rownames(result_df_wide)[nrow(result_df_wide)] = "sgTDP-43 + shUPF1/shXRN1"
 result_df_wide[result_df_wide >50] = 50
 
+result_df_wide <- result_df_wide %>% filter(sampleID %in% c(Lee_sampleID$sampleID, HeLa_sampleID$sampleID, hMN_sampleID$sampleID, Patients_sampleID$sampleID)) %>%
+  column_to_rownames("sampleID")
+
 # Annotation
 annotation <- data.frame(sampleID = c(Lee_sampleID$sampleID, HeLa_sampleID$sampleID, hMN_sampleID$sampleID, Patients_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
                          sampleType = c(Lee_sampleID$`genotype/variation`,HeLa_sampleID$SampleTitle, hMN_sampleID$sample_title, 
                                         str_split_i(Patients_sampleID$SampleTItle[1:44], " replicate",1), 
                                         Patients_sampleID$SampleTItle[45:54], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")) 
-# TDP-43 kds have less extreme effects
 
 # Lee dataset
 pheatmap(as.matrix(result_df_wide[as.character(c(Lee_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")),]), 
@@ -318,7 +321,7 @@ pheatmap(as.matrix(plot_results[,plotCEs]),
          annotation_row = plot_annotation,
         display_numbers = F)
 
-### Other patients?
+### Other patients? Not necessarily TDP
 plot_results <- result_df_wide[as.character(c("sgTDP-43", "sgTDP-43 + shUPF1/shXRN1", Patients_sampleID$sampleID[c(7:18,23:48)])),]
 plot_annotation <- data.frame(sampleID = c(Patients_sampleID$sampleID[c(7:18,23:48)], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
                               TDP = c(str_split_i(Patients_sampleID$SampleTItle[c(7:18,23:48)], " ",1), "sgTDP-43", "sgTDP-43")) %>% 
@@ -326,17 +329,49 @@ plot_annotation <- data.frame(sampleID = c(Patients_sampleID$sampleID[c(7:18,23:
 
 plotCEs <-  which((apply(plot_results[15:40,], 2, max) - apply(plot_results[3:14,], 2, max) > 0) &
                   apply(plot_results[3:14,], 2, max) < 5 & apply(plot_results[15:40,], 2, max)>5)
+patients <- which(apply(plot_results[15:40,], 1, max) > 10)
 
-plot_results[plot_results >20] = 20
-pheatmap(as.matrix(plot_results[,plotCEs]), 
+plot_results[plot_results >15] = 15
+pheatmap(as.matrix(plot_results[patients,plotCEs]), 
          show_colnames = T, 
          cluster_rows = F,
          fontsize = 12,
          color = viridis(100,option="F"), 
-         legend_breaks = c(0,10,20),
+         legend_breaks = c(0,5,10,15),
          border_color = "black",
          annotation_row = plot_annotation,
         display_numbers = F)
+
+## TARGET ALS
+patients <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP151960_PatientsTargetALS.csv")
+plot_results <- result_df_wide %>% filter(sampleID %in% patients$SampleID)
+
+plot_results <- rbind(plot_results, as.numeric(ces_kept$avgPSI_sgTARDBP))
+plot_results$sampleID[nrow(plot_results)] = "sgTDP-43"
+
+plot_results <- rbind(plot_results, as.numeric(ces_kept$`avgPSI_sgTARDBP_shXRN1/shUPF1`))
+plot_results$sampleID[nrow(plot_results)] = "sgTDP-43 + shUPF1/shXRN1"
+
+plot_results <- plot_results %>% column_to_rownames("sampleID")
+plot_results[plot_results >50] = 50
+
+sampleMeta <- snapmine::add_SnaptronMeta(data.frame(sampleID = rownames(plot_results)[1:77]), compilation = "sra_human") %>%
+  mutate(rail_id = as.character(rail_id)) %>% dplyr::select("rail_id", "sample_attributes")
+
+plotCEs <-  which((apply(plot_results[1:77,], 2, max) > 15) & (apply(plot_results[c(10,9,77,3,8,70,7),], 2, max) < 5 ) & (apply(plot_results[patients_id,], 2, max) > 5 ))
+patients_id <- which(apply(plot_results[1:77,], 1, max) > 10  & (apply(plot_results[,plotCEs], 1, median) > 0 ))
+
+plot_results[plot_results >25] = 25
+
+pheatmap((as.matrix(plot_results[c(patients_id),plotCEs])), 
+         show_colnames = T, 
+         cluster_rows = T,
+         fontsize = 12,
+         color = viridis(100,option="F"), 
+         legend_breaks = c(0,5,10,15, 20, 25),
+         border_color = "black",
+        display_numbers = F)
+
 
 
 ```
