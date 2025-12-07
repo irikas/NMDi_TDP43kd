@@ -239,19 +239,16 @@ pheatmap(as.matrix(result_df_TDPneg),
 df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
 result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_result_df_wide.RDS")
 
-Lee_sampleID <- c("2566161","2566685")
-2566685
-2566230
-2566161
-2566751
-2566428
-2566328
-2565906
-HeLa_sampleID <- c()
-hMN_sampleID <- c()
+Lee_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP185789_Lee_SraRunTable.csv") %>%
+  rename(sampleID = SnaptronID)
+HeLa_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP_Hela.csv") %>%
+  rename(sampleID = SampleID)
+hMN_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP166282_Klim_SRARunTable.csv")
+Patients_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP16744_andSHSY5Y.csv") %>%
+  arrange(SampleTItle)
 result_df_wide[is.na(result_df_wide)] = 0
 
-result_df_wide <- result_df_wide %>% filter(sampleID %in% Lee_sampleID) %>%
+result_df_wide <- result_df_wide %>% filter(sampleID %in% c(Lee_sampleID$sampleID, HeLa_sampleID$sampleID, hMN_sampleID$sampleID, Patients_sampleID$sampleID)) %>%
   column_to_rownames("sampleID")
 
 ## Add CE values from i3N
@@ -260,40 +257,86 @@ ces_kept <- data.frame(ID = ces_kept) %>%
   left_join(df %>% dplyr::select(`ID #`,avgPSI_sgTARDBP, `avgPSI_sgTARDBP_shXRN1/shUPF1`),
             by = join_by(ID == `ID #`))
 
-result_df_wide[3,] = ces_kept$avgPSI_sgTARDBP
-rownames(result_df_wide)[3] = "sgTDP-43"
+result_df_wide[nrow(result_df_wide)+1,] = ces_kept$avgPSI_sgTARDBP
+rownames(result_df_wide)[nrow(result_df_wide)] = "sgTDP-43"
 
-result_df_wide[4,] = ces_kept$`avgPSI_sgTARDBP_shXRN1/shUPF1`
-rownames(result_df_wide)[4] = "sgTDP-43 + shUPF1/shXRN1"
+result_df_wide[nrow(result_df_wide)+1,] = ces_kept$`avgPSI_sgTARDBP_shXRN1/shUPF1`
+rownames(result_df_wide)[nrow(result_df_wide)] = "sgTDP-43 + shUPF1/shXRN1"
 result_df_wide[result_df_wide >50] = 50
 
+# Annotation
+annotation <- data.frame(sampleID = c(Lee_sampleID$sampleID, HeLa_sampleID$sampleID, hMN_sampleID$sampleID, Patients_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
+                         sampleType = c(Lee_sampleID$`genotype/variation`,HeLa_sampleID$SampleTitle, hMN_sampleID$sample_title, 
+                                        str_split_i(Patients_sampleID$SampleTItle[1:44], " replicate",1), 
+                                        Patients_sampleID$SampleTItle[45:54], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")) 
 # TDP-43 kds have less extreme effects
 
-pheatmap(as.matrix(result_df_wide), 
+# Lee dataset
+pheatmap(as.matrix(result_df_wide[as.character(c(Lee_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")),]), 
          show_colnames = F, 
          fontsize = 12,
          color = viridis(100,option="B"), 
          legend_breaks = c(0,25,50),
-         border_color = "white")
+         border_color = "white",
+         annotation_row = annotation %>% filter(sampleID %in% c(Lee_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")) %>%
+           column_to_rownames("sampleID"))
 
-# What are those weird ones in nuclei but not i3n?
-list <- c()
-for(i in 1:ncol(result_df_wide)){
-  print(i)
-  if((result_df_wide[1,i] > result_df_wide[3,i]) & (result_df_wide[4,i]>result_df_wide[3,i]) & result_df_wide[1,i] > 5){
-    list <- append(list,i)
-  } else if((result_df_wide[2,i] > result_df_wide[3,i]) & (result_df_wide[4,i]>result_df_wide[3,i])& result_df_wide[1,i] > 5){
-    list <- append(list,i)
-  }
-}
+# Lee dataset only TDP-43 neg
+Lee_results <- result_df_wide[as.character(c(Lee_sampleID$sampleID[1:7], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")),]
+Lee_annotation <- data.frame(sampleID = c(Lee_sampleID$sampleID[1:7], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
+                             sampleType = c(Lee_sampleID$diagnosis[1:7], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
+                             gender = c(Lee_sampleID$gender[1:7], rep("male",2))) %>% 
+  column_to_rownames("sampleID")
 
-result_df_wide_filt <- result_df_wide[,list]
-
-pheatmap(as.matrix(result_df_wide_filt), 
+pheatmap(as.matrix(Lee_results), 
+         show_colnames = F, 
          fontsize = 12,
          color = viridis(100,option="B"), 
          legend_breaks = c(0,25,50),
-         border_color = "black")
+         border_color = "white",
+         annotation_row = Lee_annotation)
+
+
+# What are those weird ones in nuclei but not i3n? + much higher in TDPneg
+plot_results <- result_df_wide[as.character(c("sgTDP-43", "sgTDP-43 + shUPF1/shXRN1", Lee_sampleID$sampleID)),]
+plot_annotation <- data.frame(sampleID = c(Lee_sampleID$sampleID, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
+                              TDP = c(Lee_sampleID$`genotype/variation`, "sgTDP-43", "sgTDP-43"),
+                             sampleType = c(Lee_sampleID$diagnosis, "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")) %>% 
+  column_to_rownames("sampleID")
+
+plotCEs <- which((apply(plot_results[3:9,], 2, median) - apply(plot_results[1,], 2, median) > 5) &
+                   (apply(plot_results[3:9,], 2, median) - apply(plot_results[10:16,], 2, median) > 5))
+
+### USE THIS PLOT
+pheatmap(as.matrix(plot_results[,plotCEs]), 
+         show_colnames = T, 
+         cluster_rows = F,
+         fontsize = 12,
+         color = viridis(100,option="F"), 
+         legend_breaks = c(0,25,50),
+         border_color = "black",
+         annotation_row = plot_annotation,
+        display_numbers = F)
+
+### Other patients?
+plot_results <- result_df_wide[as.character(c("sgTDP-43", "sgTDP-43 + shUPF1/shXRN1", Patients_sampleID$sampleID[c(7:18,23:48)])),]
+plot_annotation <- data.frame(sampleID = c(Patients_sampleID$sampleID[c(7:18,23:48)], "sgTDP-43", "sgTDP-43 + shUPF1/shXRN1"),
+                              TDP = c(str_split_i(Patients_sampleID$SampleTItle[c(7:18,23:48)], " ",1), "sgTDP-43", "sgTDP-43")) %>% 
+  column_to_rownames("sampleID")
+
+plotCEs <-  which((apply(plot_results[15:40,], 2, max) - apply(plot_results[3:14,], 2, max) > 0) &
+                  apply(plot_results[3:14,], 2, max) < 5 & apply(plot_results[15:40,], 2, max)>5)
+
+plot_results[plot_results >20] = 20
+pheatmap(as.matrix(plot_results[,plotCEs]), 
+         show_colnames = T, 
+         cluster_rows = F,
+         fontsize = 12,
+         color = viridis(100,option="F"), 
+         legend_breaks = c(0,10,20),
+         border_color = "black",
+         annotation_row = plot_annotation,
+        display_numbers = F)
 
 
 ```
