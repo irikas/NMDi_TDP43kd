@@ -18,7 +18,7 @@ The purpose of this script is use SnapMine to check PSIs of CEs in public RNA-Se
 SnapMine package is still in development but is functional. It can be downloaded from GitHub.
 
 ```{r packages, message = FALSE, warning = FALSE}
-update.packages("BiocManager")
+#update.packages("BiocManager")
 library("BiocManager")
 packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap","viridis", "progress", "readxl","makeunique")
 
@@ -92,7 +92,7 @@ result_df_wide[is.na(result_df_wide)] = 0
 
 ## Visualize CE inclusion
 
-```{r Visual}
+```{r Visual, fig.align = "c", out.width="100%", fig.dpi=300, fig.asp=1}
 ## Subset to samples with avgPSI > 15 for at least one CE
 result_df_wide_subset <- result_df_wide %>% 
   mutate(maxPSI = apply(result_df_wide[, -1],
@@ -191,7 +191,7 @@ pheatmap(as.matrix(plotdf),
 ## Compare PSIs of all targets to TDP-43 neg nuclei
 Citation: Liu, Elaine Y *et al.* Loss of Nuclear TDP-43 Is Associated with Decondensation of LINE Retrotransposons. *Cell Rep* 27 1409-1421.e6(2019). doi:10.1016/j.celrep.2019.04.003
 
-```{r TDPneg}
+```{r TDPneg,fig.align = "c", out.width="100%", fig.dpi=300, fig.asp=1}
 df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
 result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_result_df_wide.RDS")
 Lee_sampleID <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/SRP185789_Lee_SraRunTable.csv") %>%
