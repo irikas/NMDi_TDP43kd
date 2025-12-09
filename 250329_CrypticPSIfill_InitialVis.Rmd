@@ -407,7 +407,7 @@ table(cryptic_df_high$type)
 
 ### Plots to look at dPSI as a result of NMDi 
 ### Comparison to TDP-43 KD only
-cryptic_df_dNMD <- cryptic_df_high[,c(1:19,42:54)] %>% 
+cryptic_df_dNMD <- cryptic_df_high[,c(1:18,42:54)] %>% 
   pivot_longer(20:30, names_to = "condition", names_prefix = "avg", values_to = "PSI")
 cryptic_df_dNMD_avgT <- cryptic_df_dNMD %>% filter(condition == "T")
 cryptic_df_dNMD_avgNMD <- cryptic_df_dNMD %>% filter(condition != "T") %>% 
@@ -438,24 +438,7 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
     stat_compare_means(label = "p.signif", method = "wilcox.test", ref.group = "T")
 
-# Top 30 CEs
-cryptic_df_high <- cryptic_df_high[,c(1:19,43:55)] %>% 
-  arrange(desc(maxTDP)) %>% top_n(30,wt=maxTDP) %>%
-  pivot_longer(22:28, names_to = "condition", 
-               names_prefix = "avg", values_to = "PSI") %>%
-  mutate(PSI = ifelse(is.na(PSI),0,PSI)) %>%
-  mutate(condition = factor(condition, levels=rev(c("Ctrl", "CXS", "CX", "CUS", "CXU",
-                                                "T","TXS","TX","TUS","TXU"))))
-
-cryptic_df_high %>% 
-  mutate(yName = paste0(`Gene Symbol`,"_",`CE Detail`)) %>%
-  ggplot(aes(x=yName,y=condition,fill=PSI))+ geom_tile()+
-  theme_minimal() + xlab("") + ylab("") + 
-  theme(text = element_text(color="black", family="Helvetica", size =25),
-        axis.text.x = element_text(angle = 30, hjust=1))+
-  scale_fill_viridis_c(option = "F")
-ggsave("output_fig/250506_top20_highExp.png",device = "png", 
-       width = 50, height = 25, units = "cm",limitsize = FALSE)
+## HEAT MAPS
 
 # High expressor gene expression across tissues
 cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
@@ -467,27 +450,63 @@ nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>%
 nauc_highCE_mat <- nauc_highCE[-1] %>% pivot_wider(names_from="tissue", values_from="nauc") %>% column_to_rownames(var="gene_symbol")
 
 pheatmap(t(as.matrix(nauc_highCE_mat)), 
-         color = viridis(100,option="D"),
+         color = viridis(length(seq(0,10,0.1)),option="D"),
          border_color = NA, 
-         cluster_rows = F, 
-         treeheight_row = 0, treeheight_col = 0,
-         #angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
-         #width = 10, height =10
+         cluster_rows = F,
+         show_rownames = F,
+         treeheight_row = 0, 
+         treeheight_col = 0,
+         breaks = seq(0,10,0.1)
          )
 
-# TOP 30 NAUC
-cryptic_df_high30 <- cryptic_df_high %>% group_by(`Gene Symbol`) %>%
-  summarize(max = max(maxTDP)) %>% arrange(desc(max)) %>% top_n(30,wt=max) 
+# Create matching PSI graph
+ 
 
-nauc_highCE_mat <- nauc_highCE_mat[which(rownames(nauc_highCE_mat) %in% cryptic_df_high30$`Gene Symbol`),]
-
-pheatmap(t(as.matrix(nauc_highCE_mat)), 
-         color = viridis(100,option="D"),
+orderGenes <- pheatmap(t(as.matrix(nauc_highCE_mat)), 
+         color = viridis(length(seq(0,10,0.1)),option="D"),
          border_color = NA, 
-         cluster_rows = F, 
-         treeheight_row = 0, treeheight_col = 0,
-         #angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
-         #width = 10, height =10
+         cluster_rows = F,
+         show_rownames = F,
+         treeheight_row = 0, 
+         treeheight_col = 0,
+         breaks = seq(0,10,0.1)
+         )
+crypticHighOrder <- data.frame(gene = orderGenes$tree_col$labels[orderGenes$tree_col$order])
+
+# Choose highest PSI CE for a gene with multiple in high expressors
+maxPSI <- cryptic_df_high %>% filter(`Ensembl ID` %in% nauc_highCE$gene_id) %>%
+  group_by(`Gene Symbol`) %>%
+  summarize(max = max(maxTDP)) 
+
+maxCE <- c()
+for(i in 1:nrow(maxPSI)){
+  maxCE <- append(maxCE, which(cryptic_df_high$`Gene Symbol`== maxPSI$`Gene Symbol`[i] & cryptic_df_high$maxTDP== maxPSI$max[i]))
+}
+
+maxPSI <- cryptic_df_high[maxCE,c(1:4,42:54)]
+
+# Still two duplicates due to same max - rmove the ones at a lower PSI after TDP kd only
+maxPSI <- maxPSI %>% filter(!(`ID #` %in% c("CE140","CE360"))) 
+maxPSI <- maxPSI[,c(1,5,8,7,6,9,10,13,12,11,14)]
+colnames(maxPSI)[1] = "gene"
+
+# MERGE WITH ORDERED DF
+maxPSI$gene[15] = "CTB-50L17.10"
+maxPSI$gene[12] = "C20orf194"
+
+crypticHighOrder <- left_join(crypticHighOrder, maxPSI, by = "gene") %>% 
+  column_to_rownames("gene")
+crypticHighOrder[is.na(crypticHighOrder)] = 0
+
+pheatmap(t(as.matrix(crypticHighOrder)), 
+         color = viridis(length(seq(0,100,1)),option="F"),
+         border_color = NA, 
+         cluster_rows = F,
+         cluster_cols = F,
+         show_rownames = F,
+         treeheight_row = 0, 
+         treeheight_col = 0,
+         breaks = seq(0,100,1)
          )
 
 
