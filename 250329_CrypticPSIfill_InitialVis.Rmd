@@ -229,8 +229,8 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 ```
 
 ```{r VisPieChart}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
-cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
+cryptic_df = read_delim("data/250601_CE_table.csv")
 
 pieChartFx(cryptic_df$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
 ggsave("output_fig/250602_CE_All.png",device = "png", 
@@ -393,12 +393,13 @@ ggsave("output_fig/250506_chrPmbp.png",device = "png",
 ```
 
 ```{r HighExp}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/")
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
+cryptic_df = read_delim("data/250601_CE_table.csv")
+nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
 
 ## High expressors
-cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
 cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
-write.csv(cryptic_df_high,"output_tables/250602_CrypticCoordinates_HighExp.csv")
+# write.csv(cryptic_df_high,"output_tables/250602_CrypticCoordinates_HighExp.csv")
 
 pieChartFx(cryptic_df_high$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
 table(cryptic_df_high$type)
@@ -437,10 +438,6 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
     stat_compare_means(label = "p.signif", method = "wilcox.test", ref.group = "T")
 
-
-
-
-
 # Top 30 CEs
 cryptic_df_high <- cryptic_df_high[,c(1:19,43:55)] %>% 
   arrange(desc(maxTDP)) %>% top_n(30,wt=maxTDP) %>%
@@ -461,8 +458,7 @@ ggsave("output_fig/250506_top20_highExp.png",device = "png",
        width = 50, height = 25, units = "cm",limitsize = FALSE)
 
 # High expressor gene expression across tissues
-nauc <- read_delim("data/gtex_nauc.csv")
-cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70) 
+cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
 
 nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>% 
   pivot_longer(3:58, names_to = "tissue", values_to = "nauc") %>%
@@ -470,10 +466,90 @@ nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>%
 
 nauc_highCE_mat <- nauc_highCE[-1] %>% pivot_wider(names_from="tissue", values_from="nauc") %>% column_to_rownames(var="gene_symbol")
 
-pheatmap(nauc_highCE_mat, color = rocket(100),border_color = NA, 
-         cluster_cols = F, treeheight_row = 0, treeheight_col = 0,
-         angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
-         width = 10, height =10)
+pheatmap(t(as.matrix(nauc_highCE_mat)), 
+         color = viridis(100,option="D"),
+         border_color = NA, 
+         cluster_rows = F, 
+         treeheight_row = 0, treeheight_col = 0,
+         #angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
+         #width = 10, height =10
+         )
+
+# TOP 30 NAUC
+cryptic_df_high30 <- cryptic_df_high %>% group_by(`Gene Symbol`) %>%
+  summarize(max = max(maxTDP)) %>% arrange(desc(max)) %>% top_n(30,wt=max) 
+
+nauc_highCE_mat <- nauc_highCE_mat[which(rownames(nauc_highCE_mat) %in% cryptic_df_high30$`Gene Symbol`),]
+
+pheatmap(t(as.matrix(nauc_highCE_mat)), 
+         color = viridis(100,option="D"),
+         border_color = NA, 
+         cluster_rows = F, 
+         treeheight_row = 0, treeheight_col = 0,
+         #angle_col = "90", filename = "output_fig/250506_topExp_TissueExp.png",
+         #width = 10, height =10
+         )
+
+
+```
+
+## NMDi-revealed CEs expression and PSI
+```{r NMDiCE}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
+cryptic_df = read_delim("data/250601_CE_table.csv")
+nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
+
+## Subset to CEs with PSI <= 1% after TDP-43 KD only
+# all ctrl conditions < 5%
+cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 1, ifelse(maxCtrl < 10, "Y", "N"), "N"))
+nmdOnlyCEs <- cryptic_df[which(cryptic_df$NMDonly == "Y"),]
+nauc_NMD <- nauc %>% filter(gene_id %in% nmdOnlyCEs$`Ensembl ID`) %>%
+  dplyr::select(-gene_id) %>% 
+  pivot_longer(2:57,names_to = "tissue", values_to = "nauc") %>%
+  mutate(nauc = ifelse(nauc > 10, 10, nauc)) %>%
+  pivot_wider(names_from = "tissue", values_from = "nauc") %>% 
+  column_to_rownames("gene_symbol") 
+
+# Plot nauc of all NMD-sensitive CEs
+
+#NAUC
+pheatmap(t(as.matrix(nauc_NMD)), 
+         cluster_cols = T,
+         cluster_rows = F,
+         fontsize = 12,
+         color = viridis(100,option="D"), 
+         legend_breaks = c(0,5,10),
+         border_color = NA,
+         display_numbers = F,
+         treeheight_col = 0)
+
+# PSI
+cryptic_df_plot <- cryptic_df %>% 
+  filter(`Gene Symbol` %in% c("CYFIP2", "NRXN2", "GAK", "NADSYN1", "ENAH", "PBX1")) %>%
+  dplyr::select(c(`Gene Symbol`, `ID #`,starts_with("avg"))) %>%
+  filter(!(`ID #` %in% c("CE092", "CE093","CE267"))) %>% # MANUAL SELECTION OF STRONGEST CE 
+  dplyr::select(-`ID #`) %>%
+  pivot_longer(2:11, names_to = "cond", values_to = "psi") %>%
+  pivot_wider(names_from = cond, values_from = psi, names_sort = T) %>%
+  column_to_rownames("Gene Symbol")
+
+#Re-order
+cryptic_df_plot <- cryptic_df_plot[c(1,5,3,4,2,6),c(1, 4, 3, 2, 5, 6, 9, 8, 7, 10)]
+
+# Sets the minimum (0), the maximum (15), and the increasing steps (+1) for the color scale
+# Note: if some of your genes are outside of this range, they will appear white on the heatmap
+breaksList = seq(0, 30, by = 0.1)
+
+pheatmap(t(as.matrix(cryptic_df_plot)), 
+         cluster_cols = F,
+         cluster_rows = F,
+         fontsize = 12,
+         color = viridis(length(breaksList),option="F"), 
+         legend_breaks = c(0,10,20,30),
+         border_color = NA,
+         display_numbers = F,
+         treeheight_col = 0,
+         breaks= breaksList)
 
 ```
 
