@@ -90,8 +90,9 @@
 
 ### Packages Used
 <ul>
-  <li>CRAN: BiocManager, gghighlight, ggplot2, ggpubr, ggrepel, ggstats, pheatmap, tidyverse, viridis</li>
+  <li>CRAN: BiocManager, gghighlight, ggplot2, ggpubr, ggrepel, ggstats, pheatmap, tidyverse, viridis, progress, makeunique, readxl</li>
   <li>Bioconductor: apeglm, biomaRt, Biostrings, DESeq2, clusterProfiler, org.Hs.eg.db</li>
+  <li>GitHub: snapmine</li>
 </ul>
 
 ### Pipelines Used
