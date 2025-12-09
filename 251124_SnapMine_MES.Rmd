@@ -20,7 +20,7 @@ SnapMine package is still in development but is functional. It can be downloaded
 ```{r packages, message = FALSE, warning = FALSE}
 update.packages("BiocManager")
 library("BiocManager")
-packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap","viridis", "progress")
+packages <- c("tidyverse","ggplot2","data.table","biomaRt", "pheatmap","viridis", "progress", "readxl","makeunique")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -48,7 +48,7 @@ rm(versions)
 ## Load files and run Snaptron query
 Copied from introduction vignette!
 
-```{r files, eval=T}
+```{r files, eval=F}
 ## Load df
 df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
 
@@ -83,15 +83,16 @@ result_df_wide <- calcPSI_bulk(info_df, flatten_wide = T)
 ```
 
 ```{r load_df, include = F}
-result_df_long <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_results.RDS")
+df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
+info_df <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251206_SnapMine_info_df.RDS")
+# result_df_long <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_results.RDS")
 result_df_wide <- readRDS("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251204_snapmine_result_df_wide.RDS")
+result_df_wide[is.na(result_df_wide)] = 0
 ```
 
 ## Visualize CE inclusion
 
 ```{r Visual}
-result_df_wide[is.na(result_df_wide)] = 0
-
 ## Subset to samples with avgPSI > 15 for at least one CE
 result_df_wide_subset <- result_df_wide %>% 
   mutate(maxPSI = apply(result_df_wide[, -1],
@@ -99,51 +100,30 @@ result_df_wide_subset <- result_df_wide %>%
   filter(maxPSI > 5) %>% dplyr::select(-maxPSI) 
 
 ## Subset to avgPSI > 5 for at least 10% tested CEs
-result_df_wide_subset_overall <- result_df_wide_subset%>%
-  mutate(n5 = apply(result_df_wide_subset[, -1],
+result_df_wide_subset <- result_df_wide_subset%>%
+  mutate(testFilt = apply(result_df_wide_subset[, -1],
                      MARGIN = 1,
                      function(x) length(which(x > 5)))) %>%
-  filter(n5 > round(0.10 * nrow(info_df), 0)) %>%
-  dplyr::select(-n5) %>%
+  filter(testFilt > round(0.10 * nrow(info_df), 0)) %>%
+  dplyr::select(-testFilt) %>%
   column_to_rownames(var = "sampleID")
 
-m.results <- as.matrix(result_df_wide_subset_overall)
-pheatmap(m.results, show_rownames = F, fontsize = 10,
-         color = viridis(100,option="B"))
+## Remove CEs with no values higher than 10%
+colKeep <- apply(X = result_df_wide_subset, MARGIN = 2, FUN = function(x) max(x) > 10)
+result_df_wide_subset <- result_df_wide_subset[,colKeep]
 
-## Remove CEs with no values higher than 5%
-colKeep <- apply(X = result_df_wide_subset_overall, MARGIN = 2, FUN = function(x) max(x) > 15)
-result_df_wide_subset_overall_CEsubset <- result_df_wide_subset_overall[,colKeep]
-
-pheatmap(as.matrix(result_df_wide_subset_overall_CEsubset), show_rownames = F, fontsize = 8,
+pheatmap(as.matrix(result_df_wide_subset), show_rownames = F, fontsize = 8,
         color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100))
-
-# CE with medium-high inclusion
-## Subset to avgPSI > 15 for at least 20
-result_df_TDPneg <- result_df_wide_subset_overall%>%
-  mutate(n5 = apply(result_df_wide_subset_overall,
-                     MARGIN = 1,
-                     function(x) length(which(x > 15)))) %>%
-  filter(n5 > 20) %>%
-  dplyr::select(-n5) 
-
-colKeep <- apply(X = result_df_TDPneg, MARGIN = 2, FUN = function(x) max(x) > 50)
-result_df_TDPneg <- result_df_TDPneg[,colKeep]
-pheatmap(as.matrix(result_df_TDPneg), 
-         #show_rownames = F, 
-         fontsize = 8,
-        color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100))
-
 
 # Samples with high CE inclusion
-## Subset to avgPSI > 20 for at least 42 targets
+## Subset to avgPSI > 10 for at least 42 targets (10% of all CEs)
 ## Subset to CEs within those samples with a max inclusion greater than 50
-result_df_TDPneg <- result_df_wide_subset_overall%>%
-  mutate(n5 = apply(result_df_wide_subset_overall,
+result_df_TDPneg <- result_df_wide_subset%>%
+  mutate(testFilt = apply(result_df_wide_subset,
                      MARGIN = 1,
-                     function(x) length(which(x > 15)))) %>%
-  filter(n5 > 42) %>%
-  dplyr::select(-n5) 
+                     function(x) length(which(x > 10)))) %>%
+  filter(testFilt > 42) %>%
+  dplyr::select(-testFilt) 
 
 colKeep <- apply(X = result_df_TDPneg, MARGIN = 2, FUN = function(x) max(x) > 50)
 result_df_TDPneg <- result_df_TDPneg[,colKeep]
@@ -151,84 +131,58 @@ result_df_TDPneg <- result_df_TDPneg[,colKeep]
 samples <- data.frame(sampleID = rownames(result_df_TDPneg))
 sampleMeta <- snapmine::add_SnaptronMeta(samples, compilation = "sra_human") %>%
   mutate(rail_id = as.character(rail_id))
-samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id"))
+samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id")) %>%
+  arrange(sample_title) %>% arrange(study_title) # Cluster related studies
 
+# write.csv(samples, "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251208highTDPSnapMine.csv")
 #manual
-rowAnn = data.frame(sampleID = samples$sampleID,
-                    Condition = c(rep("HeLa SMG6/7KD UPF1 CLIP",2),
-                                   rep("MDA-MB231 shTDP43/shSRSF3",2),
-                                   "HeLa shUPF1",
-                                   "hMN siTDP-43",
-                                   rep("MRC-5 MERS-CoV",5))) %>%
-  column_to_rownames("sampleID")
 
+# Sort samples manually
+# Remove samples w/o duplicates (if sequenced) unless primary sample with another sample matching from a diff study
+# Remove samples from CLIP-seq
+samples_sorted <- read_excel("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251208highTDPSnapMine_sorted.xlsx", sheet = 2)
+result_df_TDPneg <- result_df_wide %>% filter(sampleID %in% samples_sorted$sampleID)
 
-pheatmap(as.matrix(result_df_TDPneg), 
-         show_rownames = T, 
-         fontsize = 12,
-         color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100),
-         border_color = "white",
-         annotation_row = rowAnn,
-         annotation_colors = list(Condition = 
-                                    c(`HeLa SMG6/7KD UPF1 CLIP` = "#788AA3",
-                                      `MDA-MB231 shTDP43/shSRSF3` = "#C83E4D",
-                                      `HeLa shUPF1` = "#FFCF99",
-                                      `hMN siTDP-43` = "#C83E4D",
-                                      `MRC-5 MERS-CoV` = "#302F4D")))
+plotdf <- samples_sorted %>% dplyr::select(sampleID,sampleInfo, plottingGroup1) %>%
+  left_join(result_df_TDPneg %>% mutate(sampleID = as.numeric(sampleID)), by = "sampleID")
 
-# Samples with high CE inclusion
-## Subset to avgPSI > 5 for at least 25% targets
-## Subset to CEs within those samples with a max inclusion greater than 15 for at least 25% of samples
-result_df_TDPneg <- result_df_wide_subset_overall%>%
-  mutate(n5 = apply(result_df_wide_subset_overall,
-                     MARGIN = 1,
-                     function(x) length(which(x > 5)))) %>%
-  filter(n5 > (0.25*423)) %>%
-  dplyr::select(-n5) 
+rowAnn <- plotdf %>% dplyr::select(sampleInfo, plottingGroup1) %>% 
+  mutate(sampleInfo = make_unique(sampleInfo, sep = " ")) %>% 
+  column_to_rownames("sampleInfo")
 
-colKeep <- (apply(result_df_TDPneg,
-                     MARGIN = 2,
-                     function(x) length(which(x > 15)))>(0.25*nrow(result_df_TDPneg)))
+plotdf <- plotdf %>% dplyr::select(-c(sampleID,plottingGroup1)) %>%
+  mutate(sampleInfo = make_unique(sampleInfo, sep = " ")) %>% 
+  column_to_rownames("sampleInfo") 
 
-result_df_TDPneg <- result_df_TDPneg[,colKeep]
+colKeep <- apply(X = plotdf, MARGIN = 2, FUN = function(x) median(x) > 10)
+plotdf <- plotdf[,colKeep]
 
-## Add CE values from i3N
-ces_kept <- str_split_i(colnames(result_df_TDPneg),"_",2)
+## Add CE values from i3N to plotting DF
+ces_kept <- str_split_i(colnames(plotdf),"_",2)
 ces_kept <- data.frame(ID = ces_kept) %>%
-  left_join(df %>% dplyr::select(`ID #`,avgPSI_sgTARDBP, `avgPSI_sgTARDBP_shXRN1/shUPF1`),
+  left_join(df %>% dplyr::select(`ID #`,avgPSI_sgTARDBP, `maxPSI_sgTARDBP`),
             by = join_by(ID == `ID #`))
 
-result_df_TDPneg[8,] = ces_kept$avgPSI_sgTARDBP
-rownames(result_df_TDPneg)[8] = "sgTDP-43"
+plotdf <- rbind(plotdf, data.frame(ces_kept$avgPSI_sgTARDBP)[,1])
+plotdf <- rbind(plotdf, data.frame(ces_kept$maxPSI_sgTARDBP)[,1])
+rownames(plotdf)[(nrow(plotdf)-1):nrow(plotdf)] = c("sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")
 
-result_df_TDPneg[9,] = ces_kept$`avgPSI_sgTARDBP_shXRN1/shUPF1`
-rownames(result_df_TDPneg)[9] = "sgTDP-43 + shUPF1/shXRN1"
+rowAnn <- rbind(rowAnn, data.frame(plottingGroup1 = rep("TDP-43 KD",2)))
+rownames(rowAnn)[(nrow(plotdf)-1):nrow(plotdf)] = c("sgTDP-43", "sgTDP-43 + shUPF1/shXRN1")
 
-samples <- data.frame(sampleID = rownames(result_df_TDPneg)[-c(8:9)])
-sampleMeta <- snapmine::add_SnaptronMeta(samples, compilation = "sra_human") %>%
-  mutate(rail_id = as.character(rail_id))
-samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id"))
+# Put i3N data at top
+plotdf <- rbind(plotdf[(nrow(plotdf)-1):nrow(plotdf),], plotdf[1:(nrow(plotdf)-2),])
 
-#manual
-rowAnn = data.frame(sampleID = c(samples$sampleID, "sgTDP-43","sgTDP-43 + shUPF1/shXRN1"),
-                    Condition = c(rep("MDA-MB231 shTDP43",2),
-                                  rep("hMN siTDP43",2),
-                                  rep("MERS-CoV",3),
-                                  rep("i3N",2))) %>%
-  column_to_rownames("sampleID") 
-
-pheatmap(as.matrix(result_df_TDPneg), 
-         show_rownames = T, 
+# Plot
+pheatmap(as.matrix(plotdf), 
+         show_rownames = T,
+         cluster_rows = F,
          fontsize = 12,
-         color = viridis(100,option="B"), legend_breaks = c(0,20,40,60,80,100),
-         border_color = "black",
-         annotation_row = rowAnn,
-         annotation_colors = list(Condition = 
-                                    c(`MERS-CoV` = "#788AA3",
-                                      `MDA-MB231 shTDP43` = "#FFCF99",
-                                      `hMN siTDP43` = "#C83E4D",
-                                      `i3N` = "#302F4D")))
-
+         color = viridis(100,option="F"), 
+         breaks = seq(0,100,1),
+         border_color = NA,
+         treeheight_col = 0,
+         annotation_row = rowAnn)
 
 
 ```
@@ -285,22 +239,25 @@ plot_annotation <- annotation
 #  TDPpos max < 5
 
 plotCEs <- which((apply(plot_df[3:9,], 2, median) - apply(plot_df[10:16,], 2, median) > 5) &
-                   apply(plot_df[10:16,], 2, max) < 5)
+                   apply(plot_df[3:9,], 2, max) > 5 &
+                   apply(plot_df[10:16,], 2, max) < 10 & apply(plot_df[2,], 2, max) > 5 &
+                   apply(plot_df[2,], 2, median) - apply(plot_df[1,], 2, median) > 5)
 
-plotCEs <- which((apply(plot_df[3:9,], 2, median) - apply(plot_df[10:16,], 2, median) > 5) &
-                   #apply(plot_df[10:16,], 2, max) < 10 & 
-                   (apply(plot_df[2,], 2, median) - apply(plot_df[1,], 2, median) > 5))
+                 
+colOrder <- plotCEs[str_order((apply(plot_df[2,plotCEs], 2, median) - apply(plot_df[1,plotCEs], 2, median))/apply(plot_df[2,plotCEs], 2, median))]
 
 ### USE THIS PLOT
-pheatmap(as.matrix(plot_df[,plotCEs]), 
-         show_colnames = T, 
+pheatmap(as.matrix(plot_df[,rev(colOrder)]), 
+         show_colnames = T,
+         cluster_cols = F,
          cluster_rows = F,
          fontsize = 12,
          color = viridis(100,option="F"), 
-         legend_breaks = c(0,25,50),
-         border_color = "black",
+         breaks = seq(0,100,1),
+         legend_breaks = c(0,50,100),
+         border_color = NA,
          annotation_row = plot_annotation,
-        display_numbers = F)
+         display_numbers = F)
 
 
 ```
