@@ -235,7 +235,7 @@ plot_annotation <- annotation
 
 # Which CEs have a higher PSI in at least one patient than in i3N without NMDi?
 # TDPneg median - TDPpos median > 5
-#  TDPneg max < 5
+#  TDPneg max > 5
 #  TDPpos max < 10
 # TDP43 KD + NMDi max > 5
 # (TDP43 KD + NMDi)-(TDP43 KD only) > 5
