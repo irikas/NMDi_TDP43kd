@@ -194,11 +194,28 @@ plot_order = (df_long %>% group_by(gene_name,Donor_Diagnosis) %>%
 df_long %>% filter(gene_name %in% df_long_pval$gene_name) %>%
   mutate(gene_name = factor(gene_name, plot_order),
          Donor_Diagnosis = factor(Donor_Diagnosis, c("CTL","ALS"))) %>%
-  ggplot(aes(x = gene_name, y = log2(normAbundance), fill = Donor_Diagnosis)) +
+  ggplot(aes(x = Donor_Diagnosis, y = log2(normAbundance), fill = Donor_Diagnosis)) +
   geom_boxplot(outliers = F) +
   geom_jitter(aes(color=Donor_Diagnosis), position = position_jitterdodge(), 
               alpha = 0.5, size = 0.5) +
-  theme_classic()
+  facet_wrap(vars(gene_name), ncol = 9) +
+  theme_classic() +
+  stat_compare_means(aes(group = Donor_Diagnosis), label = "p.signif", vjust = -0.5) # Add pairwise comparisons p-value
+
+## Plot by type of neuron - but technically all patients have TDP-43 pathology so does it matter?
+df_long %>% filter(gene_name %in% df_long_pval$gene_name) %>%
+  mutate(gene_name = factor(gene_name, plot_order),
+         TDP43_Stage = factor(TDP43_Stage, c("CTL","NON", "MLD", "MOD", "SEV"))) %>%
+  ggplot(aes(x = TDP43_Stage, y = log2(normAbundance), fill = TDP43_Stage)) +
+  geom_boxplot(outliers = F) +
+  geom_jitter(aes(color=TDP43_Stage), position = position_jitterdodge(), 
+              alpha = 0.5, size = 0.5) +
+  facet_wrap(vars(gene_name), ncol = 9, scales = "free_y") +
+  theme_classic() +
+  stat_compare_means(aes(group = TDP43_Stage), 
+                     label = "p.signif", 
+                     vjust = 2,
+                     ref.group = "CTL")
 
 
 
