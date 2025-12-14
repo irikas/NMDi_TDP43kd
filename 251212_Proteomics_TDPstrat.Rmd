@@ -1,0 +1,212 @@
+---
+title: "Proteomics"
+author: "Irika Sinha"
+date: "2025-12-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Publication screen
+TDP-43-stratified single-cell proteomics of postmortem human spinal motor neurons reveals protein dynamics in amyotrophic lateral sclerosis
+Amanda J. Guise et al. 2024. https://doi.org/10.1016/j.celrep.2023.113636
+
+
+```{r packages, message = FALSE, warning = FALSE}
+#update.packages("BiocManager")
+library("BiocManager")
+packages <- c("tidyverse","data.table","biomaRt", "pheatmap", "ggplot2","ggpubr")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  } else{
+    BiocManager::install(pkgs = i, ask = F, update=T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+## LOAD FILES AND SUBSET
+```{r files}
+## Load df
+ce_df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/251126_CEdf.csv")
+protein_df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/Guise2024_TDP_proteomics.csv")
+protein_meta_df <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/Guise2024_TDP_proteomics_metadata.csv")
+
+## Get protein identifiers for CE genes
+mart <- useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+info <- getBM(attributes = c("ensembl_gene_id", "uniprotswissprot"), 
+              values = list(ce_df$`Ensembl ID`, protein_df$`Acc. No.`), 
+              mart = mart) %>%
+  filter(uniprotswissprot %in% protein_df$`Acc. No.`)
+
+## Subset protein_df
+ce_protein_df <- data.frame(ensembl_gene_id = ce_df$`Ensembl ID`,
+                            gene_name = ce_df$`Gene Symbol`) %>%
+  left_join(info, by = "ensembl_gene_id") %>%
+  left_join(protein_df, join_by("uniprotswissprot" == "Acc. No."))
+
+# saveRDS(ce_protein_df, "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/Guise2024_TDP_proteomics_CE.RDS")
+
+## Subset new df to CEs with data
+ce_protein_df <- ce_protein_df %>% filter(!is.na(uniprotswissprot)) %>% distinct()
+
+
+```
+
+## Huge range of values - so let's find the protein expression as a factor of the ctl
+
+```{r doMath}
+## Find the mean value for each patient for each protein
+df_long <- ce_protein_df %>% pivot_longer(cols = 6:105, names_to = "File_ID", values_to = "normAbundance") %>%
+  left_join(protein_meta_df, by = "File_ID") %>%
+  group_by(gene_name, Donor_ID, TDP43_Stage) %>% 
+  summarise(expression = mean(ifelse(is.na(normAbundance), 0, normAbundance))) %>%
+  mutate(expression = log10(expression + 0.01))%>%
+  mutate(newID = paste0(Donor_ID, "_", TDP43_Stage))
+
+## Plotting matrix
+m.plot <- df_long %>% ungroup() %>%
+  dplyr::select(-c(Donor_ID,TDP43_Stage)) %>%
+  pivot_wider(names_from = newID, values_from = expression) %>%
+  column_to_rownames("gene_name") %>% as.matrix()
+
+
+## Plot using pheatmap
+annot_df <- protein_meta_df %>% 
+  mutate(newID = paste0(Donor_ID, "_", TDP43_Stage)) %>%
+  dplyr::select(-c(File_ID,nanoWell_ID,MN_annotation)) %>%
+  distinct() %>%
+  column_to_rownames("newID") 
+
+# Plot
+pheatmap(t(m.plot), 
+         show_rownames = T,
+         cluster_rows = T,
+         fontsize = 12,
+         color = viridis(100,option="F"),
+         border_color = NA,
+         treeheight_col = 0,
+         annotation_row = annot_df)
+
+## Find mean value for each type of neuron
+df_long <- ce_protein_df %>% pivot_longer(cols = 6:105, names_to = "File_ID", values_to = "normAbundance") %>%
+  left_join(protein_meta_df, by = "File_ID") %>%
+  group_by(gene_name, TDP43_Stage) %>% 
+  summarise(expression = mean(ifelse(is.na(normAbundance), 0, normAbundance))) %>%
+  mutate(expression = log10(expression + 0.01))
+
+m.plot <- df_long %>% ungroup() %>%
+  pivot_wider(names_from = TDP43_Stage, values_from = expression) %>%
+  column_to_rownames("gene_name") %>% as.matrix()
+
+pheatmap(t(m.plot), 
+         show_rownames = T,
+         cluster_rows = T,
+         fontsize = 12,
+         color = viridis(100,option="F"),
+         border_color = NA,
+         treeheight_col = 0)
+
+## Find mean value for each type of neuron (gross categories)
+df_long <- ce_protein_df %>% pivot_longer(cols = 6:105, names_to = "File_ID", values_to = "normAbundance") %>%
+  left_join(protein_meta_df, by = "File_ID") %>%
+  mutate(TDP43_Stage = ifelse(TDP43_Stage %in% c("NON","CTL"), "NONE", "POS")) %>%
+  group_by(gene_name, TDP43_Stage) %>% 
+  summarise(expression = mean(ifelse(is.na(normAbundance), 0, normAbundance))) %>%
+  mutate(expression = log10(expression + 0.01))
+
+m.plot <- df_long %>% ungroup() %>%
+  pivot_wider(names_from = TDP43_Stage, values_from = expression) %>%
+  column_to_rownames("gene_name") %>% as.matrix()
+
+pheatmap(t(m.plot), 
+         show_rownames = T,
+         cluster_rows = T,
+         fontsize = 12,
+         color = viridis(100,option="F"),
+         border_color = NA,
+         treeheight_col = 0)
+
+## Find mean value for each type of patient (gross categories)
+df_long <- ce_protein_df %>% pivot_longer(cols = 6:105, names_to = "File_ID", values_to = "normAbundance") %>%
+  left_join(protein_meta_df, by = "File_ID") %>%
+  group_by(gene_name, Donor_Diagnosis) %>% 
+  summarise(expression = mean(ifelse(is.na(normAbundance), 0, normAbundance))) %>%
+  mutate(expression = log10(expression + 0.01))
+
+m.plot <- df_long %>% ungroup() %>%
+  pivot_wider(names_from = Donor_Diagnosis, values_from = expression) %>%
+  column_to_rownames("gene_name") %>% as.matrix()
+
+pheatmap(t(m.plot), 
+         show_rownames = T,
+         cluster_rows = T,
+         fontsize = 12,
+         color = viridis(100,option="F"),
+         border_color = NA,
+         treeheight_col = 0)
+
+# Do more math dammit
+df_long <- ce_protein_df %>% pivot_longer(cols = 6:105, names_to = "File_ID", values_to = "normAbundance") %>%
+  left_join(protein_meta_df, by = "File_ID") %>%
+  dplyr::select(-c(ensembl_gene_id,uniprotswissprot,Description, `Gene Symbol`, File_ID, nanoWell_ID)) 
+
+df_long_pval <- data.frame(gene_name = unique(df_long$gene_name),
+                           pVal = "NA")
+
+for(i in 1:nrow(df_long_pval)){
+  test_df <- df_long %>% filter(gene_name == df_long_pval$gene_name[i])
+  test_df$Donor_Diagnosis = as.factor(test_df$Donor_Diagnosis)
+  if(length(which(is.na(test_df$normAbundance))) > 50){
+    df_long_pval$pVal[i] = NA
+  } else{
+    test_p <- wilcox.test(normAbundance ~ Donor_Diagnosis,
+                        data = test_df,alternative = "less")
+    df_long_pval$pVal[i] = round(test_p$p.value,3)
+    rm(test_p)
+  }
+  
+  rm(test_df,i)
+}
+
+df_long_pval <- df_long_pval %>% filter(!is.na(pVal))
+
+## Plot
+plot_order = (df_long %>% group_by(gene_name,Donor_Diagnosis) %>% 
+  summarize(plotMean = mean(normAbundance, na.rm=T)) %>%
+  filter(!is.na(plotMean), Donor_Diagnosis == "CTL", gene_name %in% df_long_pval$gene_name) %>%
+  arrange(plotMean))$gene_name %>% rev()
+
+
+df_long %>% filter(gene_name %in% df_long_pval$gene_name) %>%
+  mutate(gene_name = factor(gene_name, plot_order),
+         Donor_Diagnosis = factor(Donor_Diagnosis, c("CTL","ALS"))) %>%
+  ggplot(aes(x = gene_name, y = log2(normAbundance), fill = Donor_Diagnosis)) +
+  geom_boxplot(outliers = F) +
+  geom_jitter(aes(color=Donor_Diagnosis), position = position_jitterdodge(), 
+              alpha = 0.5, size = 0.5) +
+  theme_classic()
+
+
+
+
+
+
+
+
+
+
+```
