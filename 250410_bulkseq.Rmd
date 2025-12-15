@@ -44,9 +44,10 @@ Nextflow RNA-seq pipeline used to generate DESeq2 objects.
 Used DESeq2 vignette to write analysis script: https://www.bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
 
 ```{r DESeq2}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
 # Load data
-load("data/nmdi_all_deseq2.dds.RData")
-cryptic_df = read_delim("output_tables/250329_CrypticCoordinates_Vis.csv")
+load("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/nmdi_all_deseq2.dds.RData")
+cryptic_df = read_delim("data/250601_CE_table.csv")
 
 # Add metadata
 colnames(dds@colData)[which(colnames(dds@colData) == "Group1")] = "Treatment"
@@ -60,108 +61,131 @@ design(dds) <- ~ tdp + NMDi + seqDate
 
 # saveRDS(dds, "data/nmdi_all_annotated_deseq2.dds.RDS")
 
-# Pre-filtering
+## Subset to samples of interest
+## Pre-filtering - there are 4 samples
+dds <- dds[,11:14]
 dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
+dds_counts <- data.frame(dds@assays@data@listData$counts) # Extract counts for later
 
-
-# DESeq2 Analysis: Subset to WT and TDP-43 KD without NMDi
+## DESeq2 Analysis
 # Add experiment design
-# Log fold change shrinkage for visualization and ranking: "apeglm is the adaptive t prior shrinkage estimator from the apeglm package (Zhu, Ibrahim, and Love 2018). As of version 1.28.0, it is the default estimator."
-# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
-dds_noNMDi <- dds[,11:14]
-dds_noNMDi$tdp <- factor(dds_noNMDi$tdp, levels = c("WT","KD"))
-design(dds_noNMDi) <- ~ tdp
-dds_noNMDi <- DESeq(dds_noNMDi)
-res <- results(dds_noNMDi, contrast=c("tdp","KD","WT"))
-resLFC <- lfcShrink(dds_noNMDi, coef="tdp_KD_vs_WT", type="apeglm")
-resLFC <- data.frame(resLFC) %>% filter(!is.na(log2FoldChange)) %>% 
-  mutate(neglog10p = -log10(padj), 
-         geneType=NA, geneName=NA, TDPCE=NA, log2FoldChange_adj=log2FoldChange)
+# LFC shrinkage for vis + Extract results
+dds$tdp <- factor(dds$tdp, levels = c("WT","KD"))
+design(dds) <- ~ tdp
+dds <- DESeq(dds)
+# res <- results(dds, contrast=c("tdp","KD","WT"))
+res <- lfcShrink(dds, coef="tdp_KD_vs_WT", type="apeglm")
 
-# Use cryptic_df to map CE details to results
+# Create dataframe with logFC and p.adj values for each gene. Add empty cols for CE type, CE name, TDPCE (1-PSI)
+res_df <- data.frame(res) %>% filter(!is.na(log2FoldChange)) %>% 
+  mutate(neglog10p = -log10(padj), gene_type=NA, gene_name=NA, ce_psi=NA)
+
+## Populate results df using CE information
 for(i in 1:nrow(cryptic_df)){
-  n = which(rownames(resLFC) == cryptic_df$`Ensembl ID`[i])
-  resLFC$geneType[n] = cryptic_df$Type[i]
-  resLFC$geneName[n] = cryptic_df$`Gene Symbol`[i]
-  resLFC$TDPCE[n] = 1-(cryptic_df$maxTDP[i]- cryptic_df$avgT[i])/100
+  n = which(rownames(res_df) == cryptic_df$`Ensembl ID`[i]) # Identify row in results
+  res_df$gene_type[n] = tolower(cryptic_df$type[i])
+  res_df$gene_name[n] = cryptic_df$`Gene Symbol`[i]
+  res_df$ce_psi[n] = (cryptic_df$avgT[i])/100
   
-  # ADJ
-  resLFC$log2FoldChange_adj[n] = resLFC$log2FoldChange[n] - log2((resLFC$TDPCE[n]+0.0001))
-  
-  rm(i)
+  rm(i,n)
 }
 
 # Plot log2FC vs -log10Padj with CEs with abs(lfc) > 1 and p.adj < 10^-20 named on plot
-resLFC %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+res_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,geneName,"")) %>%
-  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
+                  gene_name = ifelse(neglog10p>20 & abs(log2FoldChange) > 1,gene_name,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(gene_type)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
-  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
-  geom_label_repel(aes(label = geneName), 
+  gghighlight(!is.na(gene_type),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = gene_name), 
                    box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
                    fill = alpha(c("white"),0.8), label.size = NA)+
   scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60)
-ggsave("output_fig/250413_Ctrl_TDPkd_GEx.png",device = "png", 
-       width = 50, height = 30, units = "cm",limitsize = FALSE)
+# ggsave("output_fig/250413_Ctrl_TDPkd_GEx.png",device = "png", 
+#        width = 50, height = 30, units = "cm",limitsize = FALSE)
 
 ## Create new dds object for CE-adjusted p-vales
-# First extract the raw counts
-raw_counts <- data.frame(dds_noNMDi@assays@data@listData$counts)
-
 # For each gene with a cryptic exon, change the TDPKD value to reflect effective downregulation of the gene due to CE inclusion
 # Multiply raw_count value by (1-CE_PSI)
+adj_count <- dds_counts
+cryptic_df$pct_transcript = 1
+
 for(i in 1:nrow(cryptic_df)){
-  n = which(rownames(raw_counts) == cryptic_df$`Ensembl ID`[i])
-  tonly = ifelse(!is.na(cryptic_df$avgT[i]),cryptic_df$avgT[i],0)
-  TDPCE = 1-(cryptic_df$maxTDP[i]- tonly)/100
-  raw_counts$TDPKD_1[n] = as.integer(round((raw_counts$TDPKD_1[n])*TDPCE,0))
-  raw_counts$TDPKD_2[n] = as.integer(round((raw_counts$TDPKD_2[n])*TDPCE,0))
+  n = which(rownames(adj_count) == cryptic_df$`Ensembl ID`[i]) # Identify row in counts for CE
+  TDPKD_PSI = ifelse(!is.na(cryptic_df$avgT[i]),cryptic_df$avgT[i],0) # Extract TDP-43 KD only PSI
+  pct_transcript = 1-TDPKD_PSI/100 # Calculate % functional
+  cryptic_df$pct_transcript[i] = pct_transcript
   
-  rm(i, n, TDPCE)
+  # Adjust counts
+  adj_count$TDPKD_1[n] = as.integer(round((adj_count$TDPKD_1[n])*pct_transcript,0))
+  adj_count$TDPKD_2[n] = as.integer(round((adj_count$TDPKD_2[n])*pct_transcript,0))
+  
+  rm(i, n, TDPKD_PSI,pct_transcript)
 }
 
-# Create DESeq2 object and do analysis as before
-dds_noNMDi_adj <- DESeqDataSetFromMatrix(countData = as.matrix(raw_counts),
-                              colData = dds_noNMDi@colData,
+## Create DESeq2 object and do analysis as before
+# Extract results
+dds_adj <- DESeqDataSetFromMatrix(countData = as.matrix(adj_count),
+                              colData = dds@colData,
                               design = ~ tdp)
 
-dds_noNMDi_adj <- DESeq(dds_noNMDi_adj)
-resLFC_adj <- lfcShrink(dds_noNMDi_adj, coef="tdp_KD_vs_WT", type="apeglm")
-resLFC_adj <- data.frame(resLFC_adj) %>% filter(!is.na(log2FoldChange)) %>% 
-  mutate(neglog10p = -log10(padj), 
-         geneType=NA, geneName=NA)
+dds_adj <- DESeq(dds_adj)
+res_adj <- lfcShrink(dds_adj, coef="tdp_KD_vs_WT", type="apeglm")
+res_adj_df <- data.frame(res_adj) %>% filter(!is.na(log2FoldChange)) %>% 
+  mutate(neglog10p = -log10(padj), gene_type=NA, gene_name=NA,
+         gene_NMD = NA)
 
+## Populate results df using CE information
 for(i in 1:nrow(cryptic_df)){
-  n = which(rownames(resLFC_adj) == cryptic_df$`Ensembl ID`[i])
-  resLFC_adj$geneType[n] = cryptic_df$Type[i]
-  resLFC_adj$geneName[n] = cryptic_df$`Gene Symbol`[i]
+  n = which(rownames(res_adj_df) == cryptic_df$`Ensembl ID`[i])
+  res_adj_df$gene_type[n] = toupper(cryptic_df$type[i])
+  res_adj_df$gene_name[n] = cryptic_df$`Gene Symbol`[i]
+  
+  if(cryptic_df$avgT[i] < 5 | is.na(cryptic_df$avgT[i])){
+    res_adj_df$gene_NMD[n] = cryptic_df$`Gene Symbol`[i]
+  }
   rm(i)
 }
 
 # Graph CE-adjusted log2FC and -log10p.adj
 # CEs with (lfc) < -1 and p.adj < 10^-20 named on plot
-#saveRDS(resLFC_adj,"data/resLFC_adj.RDS")
-resLFC_adj %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+# saveRDS(res_adj,"data/251214_resLFC_adj.RDS")
+res_adj_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  geneName = ifelse(neglog10p>20 & log2FoldChange < -1,geneName,"")) %>%
-  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(geneType)))+ 
+                  gene_name = ifelse(neglog10p>20 & log2FoldChange < -1,gene_name,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(gene_type)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
-  gghighlight(!is.na(geneType),unhighlighted_params = list(alpha=0.5, size=2))+
-  geom_label_repel(aes(label = geneName), 
+  gghighlight(!is.na(gene_type),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = gene_name), 
                    box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
                    fill = alpha(c("white"),0.8), label.size = NA)+
   scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60)
-ggsave("output_fig/250430_Ctrl_TDPkd_GEx_adj.png",device = "png", 
+ggsave("output_fig/251215_Ctrl_TDPkd_GEx_adj.png",device = "png", 
        width = 50, height = 30, units = "cm",limitsize = FALSE)
+
+## NMDi-specific
+res_adj_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange = ifelse(log2FoldChange < -5,-5, 
+                                          ifelse(log2FoldChange > 5, 5, log2FoldChange)),
+                  gene_NMD = ifelse(neglog10p > -log10(0.05) & log2FoldChange < log2(0.8),gene_NMD,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(gene_type)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(!is.na(gene_type),unhighlighted_params = list(alpha=0.5, size=2))+
+  geom_label_repel(aes(label = gene_NMD), 
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"))+
+  ylim(0,60)
 
 
 
