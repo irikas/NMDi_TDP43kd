@@ -109,16 +109,23 @@ res_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
 #        width = 50, height = 30, units = "cm",limitsize = FALSE)
 
 ## Create new dds object for CE-adjusted p-vales
+adj_count <- dds_counts
+cryptic_df_PSImax <- cryptic_df[,-c(7:8,10:41)] %>% 
+  group_by(`Gene Symbol`, `Ensembl ID`) %>% 
+  summarize(avgT = max(avgT)) %>% # For gene with multiple CEs, choose higher PSI
+  left_join(cryptic_df %>% dplyr::select(`Gene Symbol`,type,avgT,maxTDP), 
+            by = c("Gene Symbol", "avgT")) %>%
+  ungroup() %>%
+  mutate(pct_transcript = 1, type = tolower(type)) %>%
+  distinct()
+
 # For each gene with a cryptic exon, change the TDPKD value to reflect effective downregulation of the gene due to CE inclusion
 # Multiply raw_count value by (1-CE_PSI)
-adj_count <- dds_counts
-cryptic_df$pct_transcript = 1
-
-for(i in 1:nrow(cryptic_df)){
-  n = which(rownames(adj_count) == cryptic_df$`Ensembl ID`[i]) # Identify row in counts for CE
-  TDPKD_PSI = ifelse(!is.na(cryptic_df$avgT[i]),cryptic_df$avgT[i],0) # Extract TDP-43 KD only PSI
+for(i in 1:nrow(cryptic_df_PSImax)){
+  n = which(rownames(adj_count) == cryptic_df_PSImax$`Ensembl ID`[i]) # Identify row in counts for CE
+  TDPKD_PSI = ifelse(!is.na(cryptic_df_PSImax$avgT[i]),cryptic_df_PSImax$avgT[i],0) # Extract TDP-43 KD only PSI
   pct_transcript = 1-TDPKD_PSI/100 # Calculate % functional
-  cryptic_df$pct_transcript[i] = pct_transcript
+  cryptic_df_PSImax$pct_transcript[i] = pct_transcript
   
   # Adjust counts
   adj_count$TDPKD_1[n] = as.integer(round((adj_count$TDPKD_1[n])*pct_transcript,0))
@@ -137,17 +144,22 @@ dds_adj <- DESeq(dds_adj)
 res_adj <- lfcShrink(dds_adj, coef="tdp_KD_vs_WT", type="apeglm")
 res_adj_df <- data.frame(res_adj) %>% filter(!is.na(log2FoldChange)) %>% 
   mutate(neglog10p = -log10(padj), gene_type=NA, gene_name=NA,
+         TDP_only = NA, TDP_max = NA, log2psi = NA,
          gene_NMD = NA)
 
 ## Populate results df using CE information
-for(i in 1:nrow(cryptic_df)){
-  n = which(rownames(res_adj_df) == cryptic_df$`Ensembl ID`[i])
-  res_adj_df$gene_type[n] = toupper(cryptic_df$type[i])
-  res_adj_df$gene_name[n] = cryptic_df$`Gene Symbol`[i]
+for(i in 1:nrow(cryptic_df_PSImax)){
+  n = which(rownames(res_adj_df) == cryptic_df_PSImax$`Ensembl ID`[i])
+  res_adj_df$gene_type[n] = toupper(cryptic_df_PSImax$type[i])
+  res_adj_df$gene_name[n] = cryptic_df_PSImax$`Gene Symbol`[i]
+  res_adj_df$TDP_only[n] = cryptic_df_PSImax$avgT[i]
+  res_adj_df$TDP_max[n] = cryptic_df_PSImax$maxTDP[i]
+  res_adj_df$log2psi[n] = log2((cryptic_df_PSImax$maxTDP[i] + 0.01) / (cryptic_df_PSImax$avgT[i] + 0.01))
   
-  if(cryptic_df$avgT[i] < 5 | is.na(cryptic_df$avgT[i])){
-    res_adj_df$gene_NMD[n] = cryptic_df$`Gene Symbol`[i]
+  if(cryptic_df_PSImax$avgT[i] < 10 | is.na(cryptic_df_PSImax$avgT[i] )){
+    res_adj_df$gene_NMD[n]  = cryptic_df_PSImax$`Gene Symbol`[i]
   }
+  
   rm(i)
 }
 
@@ -158,7 +170,7 @@ res_adj_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  gene_name = ifelse(neglog10p>20 & log2FoldChange < -1,gene_name,"")) %>%
+                  gene_name = ifelse(log2psi>20 & log2FoldChange < -1,gene_name,"")) %>%
   ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(gene_type)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(gene_type),unhighlighted_params = list(alpha=0.5, size=2))+
@@ -176,16 +188,27 @@ res_adj_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
                   neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
                   log2FoldChange = ifelse(log2FoldChange < -5,-5, 
                                           ifelse(log2FoldChange > 5, 5, log2FoldChange)),
-                  gene_NMD = ifelse(neglog10p > -log10(0.05) & log2FoldChange < log2(0.8),gene_NMD,"")) %>%
-  ggplot(aes(x=log2FoldChange,y=neglog10p, color=factor(gene_type)))+ 
+                  log2psi = ifelse(log2psi > 5, 5, log2psi),
+                  gene_NMD = ifelse(log2psi> log2(1.2) & log2FoldChange < log2(0.8),gene_NMD,"")) %>%
+  ggplot(aes(x=log2FoldChange,y=log2psi, color=factor(gene_type)))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(gene_type),unhighlighted_params = list(alpha=0.5, size=2))+
   geom_label_repel(aes(label = gene_NMD), 
                    box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
-                   fill = alpha(c("white"),0.8), label.size = NA)+
+                   fill = alpha(c("white"),0.8), label.size = NA, size = 3)+
   scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
-  theme(text = element_text(family="Helvetica"))+
-  ylim(0,60)
+  theme(text = element_text(family="Helvetica"))
+
+t <- res_adj_df %>% mutate(neglog10p = ifelse(is.infinite(neglog10p), 50, neglog10p),
+                  neglog10p = ifelse(neglog10p > 50, 50, neglog10p),
+                  log2FoldChange = ifelse(log2FoldChange < -5,-5, 
+                                          ifelse(log2FoldChange > 5, 5, log2FoldChange)),
+                  log2psi = ifelse(log2psi > 5, 5, log2psi),
+                  gene_NMD = ifelse(log2psi> log2(1.2) & log2FoldChange < log2(0.8),gene_NMD,"")) %>%
+  filter(!is.na(log2psi)) %>%
+  dplyr::select(log2FoldChange,log2psi) %>% as.matrix()
+
+pheatmap(t(t), color = viridis::inferno(1000))
 
 
 
