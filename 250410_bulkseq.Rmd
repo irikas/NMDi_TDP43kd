@@ -184,7 +184,6 @@ for(i in 1:nrow(cryptic_df_PSImax)){
 This is the unadjusted volcano plot for gene expression
 ```{r plot_org, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo")
-res_df <- readRDS("output_tables/251216_NMDi_bulkseq_res.RDS")
 
 # Plot log2FC vs -log10Padj with CEs with abs(lfc) > 1 and p.adj < 10^-20 named on plot
 res_df %>% mutate(logp_org = ifelse(is.infinite(logp_org) | logp_org > 50, 50, logp_org), # Set max limit for -log10P
