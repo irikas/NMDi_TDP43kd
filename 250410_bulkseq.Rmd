@@ -20,7 +20,7 @@ The purpose of this script is to take the file with manually identified cryptic 
 library("BiocManager")
 packages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager",
               "viridis","gghighlight", "ggrepel","apeglm", "DESeq2", "knitr",
-              "biomaRt")
+              "biomaRt", "readxl")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -263,5 +263,49 @@ res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
   xlim(-5,2.5)+ylim(0,6)+
   labs(x = "log2FC (psi-adj)", y = "log2PSI (nmdi/tdponly)", 
        title = "Increased nmdi of ce moderately correlated with decreased l2fc")
+
+# Graph CE-adjusted log2FC and unadjusted log2FC
+res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
+  mutate(lfc_org = ifelse(lfc_org < -2,-2, ifelse(lfc_org > 2, 2, lfc_org)), # Set limits for log2FC
+         lfc_adj = ifelse(lfc_adj < -2,-2, ifelse(lfc_adj > 2, 2, lfc_adj)), # Set limits for log2FC
+         tdpkd_psi = ifelse(is.na(tdpkd_psi), 0, tdpkd_psi),
+         tdpkd_nmdi_psi = ifelse(is.na(tdpkd_nmdi_psi), 0, tdpkd_nmdi_psi),
+         gene_NMD = ifelse(tdpkd_psi < 10, ifelse(tdpkd_psi < 5, "5pct", "10pct"), "TDP-43 KD only"),
+         gene_label = ifelse(tdpkd_psi > 50,external_gene_name,"")) %>% # Label points for genes with PSI >= 50% 
+  ggplot(aes(x=lfc_adj,y=tdpkd_nmdi_psi))+ 
+  geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)),  shape = 21, color = "#363636") +   theme_classic() + 
+  gghighlight(gene_NMD != "TDP-43 KD only",unhighlighted_params = list(alpha=0.8, size=5, shape = 16))+
+  scale_fill_manual(values=c("#69140E","#e5a4cb"))+
+  geom_vline(xintercept = 0, linetype = "dotted", linewidth = 1)+
+  geom_label_repel(aes(label = gene_label), 
+                   box.padding = 0.5, max.overlaps = Inf,fontface = "bold",
+                   fill = alpha(c("white"),0.8), label.size = NA)+
+  theme(text = element_text(family="Helvetica"))
+
+```
+
+## qPCR targets
+```{r qpcr, fig.align = "center", out.width="75%", fig.dpi=300, fig.asp=0.6}
+## Load files
+qpcr_df <- readxl::read_xlsx("data/250905_qPCR_RNAs.xlsx")
+qpcr_genes <- unique(qpcr_df$gene) 
+qpcr_genes <- qpcr_genes[which(!(qpcr_genes %in% c("Ctrl","TARDBP")))]
+
+# Plot log2FC vs -log10Padj
+# Highlight qPCR genes
+res_df %>% mutate(logp_adj = ifelse(is.infinite(logp_adj) | logp_adj > 50, 50, logp_adj), # Set max limit for -log10P
+                  lfc_adj = ifelse(lfc_adj < -5,-5, ifelse(lfc_adj > 5, 5, lfc_adj)), # Set limits for log2FC
+                  gene_label = ifelse(external_gene_name %in% qpcr_genes,external_gene_name,"")) %>% # ID labeled CEs
+  filter(!is.na(logp_adj)) %>% ungroup() %>% 
+  ggplot(aes(x=lfc_adj,y=logp_adj, color=factor(ce_type)))+ 
+  geom_point(alpha=0.8,size=3) + theme_classic() + 
+  gghighlight(gene_label != "",unhighlighted_params = list(alpha=0.5, size=2))+ # Color points by CE type
+  geom_label_repel(aes(label = gene_label), 
+                   box.padding = 0.5, max.overlaps = Inf, fontface = "bold",
+                   fill = alpha(c("white"),0.5), label.size = NA)+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  theme(text = element_text(family="Helvetica"))+
+  ylim(0,60) + ylab("-log10P") + xlab("log2FC")
+
 
 ```
