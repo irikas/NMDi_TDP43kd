@@ -253,7 +253,7 @@ ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png",
 table(cryptic_df$`Annotated Alternate Exon`)
 
 # NMD reveal
-cryptic_df = read_delim("output_tables/250602_CrypticCoordinates_Fill.csv")
+cryptic_df = read_delim("data/250601_CE_table.csv")
 cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
                                     NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
@@ -298,8 +298,8 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
   mutate(facetCol = factor(facetCol, levels=c("TXS","TX","TUS","TXU"))) %>%
   ggplot(aes(x = condition, y = PSI)) +
   geom_line(aes(group=`ID #`), alpha = 0.07) +
-  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
-               outlier.color = "#444444",outlier.size = 1) +
+  geom_boxplot(alpha=1, outliers = T, fill = c(rep(c("#444444","#D1D1D1"),4)), color = "black",
+               outlier.color = "#444444",outlier.size = 5, linewidth = 3) +
   theme_classic()+ xlab("") + ylab("Average R/L PSI") +
   theme(text = element_text(size = 14, family = "Helvetica"), 
         axis.line.x = element_blank(),
@@ -308,10 +308,10 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
+  #geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
   facet_wrap(~ facetCol, scales = "free_x", ncol = 4) 
-ggsave("output_fig/250602_NMDi_Effect_Paired.png",device = "png", 
-       width = 50, height = 30, units = "cm",limitsize = FALSE)
+ggsave("output_fig/251212_NMDi_Effect_Paired.png",device = "png", 
+       width = 50, height = 40, units = "cm",limitsize = FALSE)
 
 
 cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
