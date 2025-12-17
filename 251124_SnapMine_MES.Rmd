@@ -135,7 +135,6 @@ samples <- samples %>% full_join(sampleMeta, by = join_by("sampleID" == "rail_id
   arrange(sample_title) %>% arrange(study_title) # Cluster related studies
 
 # write.csv(samples, "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/output_tables/251208highTDPSnapMine.csv")
-#manual
 
 # Sort samples manually
 # Remove samples w/o duplicates (if sequenced) unless primary sample with another sample matching from a diff study
