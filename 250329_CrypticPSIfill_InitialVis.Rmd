@@ -522,6 +522,16 @@ nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/Wong
 # all ctrl conditions < 5%
 cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 1, ifelse(maxCtrl < 10, "Y", "N"), "N"))
 nmdOnlyCEs <- cryptic_df[which(cryptic_df$NMDonly == "Y"),]
+
+## Table Information
+nmdOnlyCEs_df <- cryptic_df %>% 
+  mutate(NMDonly = ifelse(avgT <= 10, ifelse(maxCtrl < 10, "10pct", "N"), "N"),
+         NMDonly = ifelse(avgT <= 5, ifelse(maxCtrl < 10, "5pct", NMDonly), NMDonly),
+         NMDonly = ifelse(avgT <= 1, ifelse(maxCtrl < 10, "1pct", NMDonly), NMDonly)) %>%
+  filter(NMDonly != "N")
+
+# write.csv(nmdOnlyCEs_df[,c(1:7,9,42:55)],"output_tables/251215_NMD_CrypticCoordinates.csv", row.names = F)
+
 nauc_NMD <- nauc %>% filter(gene_id %in% nmdOnlyCEs$`Ensembl ID`) %>%
   dplyr::select(-gene_id) %>% 
   pivot_longer(2:57,names_to = "tissue", values_to = "nauc") %>%
@@ -530,7 +540,6 @@ nauc_NMD <- nauc %>% filter(gene_id %in% nmdOnlyCEs$`Ensembl ID`) %>%
   column_to_rownames("gene_symbol") 
 
 # Plot nauc of all NMD-sensitive CEs
-
 #NAUC
 pheatmap(t(as.matrix(nauc_NMD)), 
          cluster_cols = T,
