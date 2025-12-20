@@ -40,32 +40,60 @@ rm(versions)
 ```{r DataQC}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
 data <- read_csv("data/251117_qPCR_data.csv") %>% 
-  filter(!is.na(Primers)) 
+  filter(!is.na(Primers)  & Primers != "NA" & CT != "Undetermined") %>%
+  mutate(UI = paste0(Target,"_", SampleID,"_",Primers))
+data_2 <- readxl::read_xlsx("data/251218_qPCR_Calculations.xlsx") %>% 
+  filter(!is.na(Primers) & Primers != "NA" & CT != "Undetermined") %>%
+  mutate(Primers = ifelse(Primers == Target, "Target", Primers),
+         UI = paste0(Target,"_", SampleID,"_",Primers))
 shRNA_key <- read_xlsx("data/250905_qPCR_RNAs.xlsx", sheet = 1) %>% 
   dplyr::select(gene, id, shRNA) %>% distinct()
-  
-## Test for primer failure?
-## Couple with multiple peaks - perhaps re-test primers
-
-# PRIMERS: AKT3, ATG4B, CBARP, INTS8, ITGA7, MADD, MAST1, PKN1, NSMCE4A, RAP1GAP, ZNF23
-m <- as.matrix(table(paste0(data$Target[which(!is.na(data$Tm2))], " KD"),data$Primers[which(!is.na(data$Tm2))]))
-pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
-
-m <- as.matrix(table(paste0(data$Target[which(!is.na(data$Tm3))], " KD"),data$Primers[which(!is.na(data$Tm3))]))
-pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
-
-## Remove failed experiments
-data <- data %>% filter(CT != "Undetermined", !(SampleID %in% c("#7-21", "#7-22"))) %>%
-  left_join(shRNA_key, by = join_by(SampleID == id, Target == gene))
 
 ## Calculate average CT and sd of CT
-data_grouped <- data %>% group_by(Target,shRNA, SampleID, Primers) %>% 
-  summarize(ct1 = as.numeric(list(CT)[1][[1]][1]), ct2=as.numeric(list(CT)[1][[1]][2]),
-            ct_diff=abs(as.numeric(list(CT)[1][[1]][1])-as.numeric(list(CT)[1][[1]][2])),
-            avgCT = round(mean(as.numeric(CT)),2), 
-            sdCT = round(sd(as.numeric(CT)), 2))
+data <- data %>% group_by(Target, SampleID, Primers,UI) %>% 
+  summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
+            ct_diff=abs(ct2-ct1),
+            avgCT = round(mean(c(ct2,ct1)),2), 
+            sdCT = round(sd(c(ct2,ct1)),2))
 
-data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
+data_2 <- data_2 %>% group_by(Target, SampleID, Primers,UI) %>% 
+  summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
+            ct_diff=abs(ct2-ct1),
+            avgCT = round(mean(c(ct2,ct1)),2), 
+            sdCT = round(sd(c(ct2,ct1)),2))
+
+## Replace samples that are re-done in data df and then merge
+# Data #2 includes samples re-done due to Ct differences > 0.5
+df <- data.frame()
+df_2 <- data_2
+
+for(i in 1:nrow(data)){
+  # Was this experiment re-done?
+  if(data$UI[i] %in% df_2$UI){
+    row = which(df_2$UI == data$UI[i]) # Identify row for new experiment
+    df <- rbind(df, df_2[row,]) # Add new data
+    df_2 <- df_2[-row,] # remove from df_2
+    rm(row)
+  } else{
+    # Experiment was not re-done
+    df <- rbind(df, data[i,]) # Add original data
+  }
+  rm(i)
+}
+
+df <- rbind(df, df_2)
+
+# Does not pass - check against first two values
+potential_redo <- df %>% filter(ct_diff > 0.5)
+prev_redo <- potential_redo[which(potential_redo$UI %in% data$UI),] %>%
+  left_join(data, by = c("Target", "SampleID","Primers","UI"), suffix = c("_2","_1")) %>%
+  rowwise() %>%
+  mutate(avg_overall = mean(c(ct1_1, ct1_2, ct2_1, ct2_2)),
+         sd_overall = sd(c(ct1_1, ct1_2, ct2_1, ct2_2)))
+
+## Check all
+
+df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
   ggplot(aes(x=key, y = ct_diff, fill = Primers))+
   geom_col(position = "dodge")+
@@ -73,12 +101,11 @@ data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   xlab("KDTarget_shRNA")+theme_classic() + ylab("CT Difference for Duplicates")+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_x_discrete(expand=c(0,0)) + 
-  scale_y_continuous(expand=c(0,0), lim=c(0,6)) +
-  geom_hline(yintercept = 0.5, linetype="dotted") +
-  coord_fixed(ratio = 5) + 
+  scale_y_continuous(expand=c(0,0), lim=c(0,2)) +
+  geom_hline(yintercept = 0.5, linetype="dotted") 
   labs(title = "All experiments")
 
-data_grouped %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
+df %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
   ggplot(aes(x=Primers, y = ct_diff, fill = SampleID))+
   geom_col(position = "dodge")+
   scale_fill_viridis(option = "B", discrete=T, begin = 0, end = 0.8, name="Sample")+
@@ -86,11 +113,10 @@ data_grouped %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_x_discrete(expand=c(0,0)) + 
   scale_y_continuous(expand=c(0,0), lim=c(0,1)) +
-  geom_hline(yintercept = 0.5, linetype="dotted") + 
-  coord_fixed(ratio = 20) + 
+  geom_hline(yintercept = 0.5, linetype="dotted") 
   labs(title = "Ctrl and TDP-43 KD samples")
   
-data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
+df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
   ggplot(aes(x=ct1, y = ct2, color = Primers))+
   geom_point(size=3, alpha=0.8)+theme_classic()+
@@ -99,48 +125,22 @@ data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   geom_abline(slope=1, intercept=0.5, linetype="dotted")+
   geom_text_repel(aes(label=ifelse(ct_diff>0.5,SampleID,"")),
                   size=3,min.segment.length = 0,
-                  max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")+
-  coord_fixed(ratio = 1) 
+                  max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")
 
 ## Re-do samples with CT difference > 0.5
-potentialRedos <- (data_grouped %>% filter(ct_diff > 0.5))$SampleID
-
-```
-
-12/18/2025
-```{r data_qc2}
-data_2 <- readxl::read_xlsx("data/251218_qPCR_Calculations.xlsx")
-
-## Test for primer failure?
-# Potential primer failures: MAST1, ITGA7, MADD, NSMCE4A, EXD3, DAPK1, CYFIP2, CBARP
-# Gel compared, potential failures: NSMCE4A, EXD3 (very light) -> okay in WT?
-# Re-design: NSMCE4A
-m <- as.matrix(table(paste0(data_2$Target[which(!is.na(data_2$Tm2))], " KD"),data_2$Primers[which(!is.na(data_2$Tm2))]))
-pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
-
-## Calculate average CT and sd of CT
-data_2 <- data_2 %>% filter(CT != "Undetermined", AMPStatus_Score == "Amp") %>%
-  left_join(shRNA_key, by = join_by(SampleID == id, Target == gene))
-data_2_grouped <- data_2 %>% group_by(Target,shRNA, SampleID, Primers) %>% 
-  summarize(ct1 = as.numeric(list(CT)[1][[1]][1]), ct2=as.numeric(list(CT)[1][[1]][2]),
-            ct_diff=abs(as.numeric(list(CT)[1][[1]][1])-as.numeric(list(CT)[1][[1]][2])),
-            avgCT = round(mean(as.numeric(CT)),2), 
-            sdCT = round(sd(as.numeric(CT)), 2))
-
-# Recalc sd for samples with 4 trials
-merge_df <- full_join(data_grouped[,1:6], data_2_grouped[,1:6], by = c("Target","shRNA","SampleID","Primers"), suffix = c("_1","_2")) %>%
-  rowwise() %>% mutate(avg_overall = mean(c(ct1_1, ct2_1,ct1_2, ct2_2), na.rm = T),
-                       sd_overall = sd(c(ct1_1, ct2_1,ct1_2, ct2_2), na.rm = T))
-
-
+potentialRedos <- (df %>% filter(ct_diff > 0.5)) %>% arrange(SampleID) %>% arrange(Primers)
+#write.csv(potentialRedos,"output_tables/251218_qPCR_redo.csv")
 
 
 ```
-
 
 
 
 ```{r ddct}
+## Add shRNA metadata
+df <- df %>% left_join(shRNA_key, by = join_by(SampleID == id, Target == gene)) %>% 
+  dplyr::select(-UI)
+
 ## Calculate -ddCT for okay samples
 calculate_df_Ctrl <- data_grouped %>% 
   filter(SampleID == "Ctrl") %>% ungroup() %>%
