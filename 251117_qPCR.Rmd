@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r packages}
+```{r packages, message=FALSE}
 library("BiocManager")
 packages <- c("tidyverse", "ggrepel","viridis", "ggridges", "pheatmap","readxl")
 
@@ -17,7 +17,7 @@ for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
     BiocManager::install(pkgs = i, ask = F)
   } else{
-    BiocManager::install(pkgs = i, ask = F, update=T)
+    #BiocManager::install(pkgs = i, ask = F, update=T)
   }
   library(package = i, character.only = T, quietly = T)
   rm(i)
@@ -32,19 +32,22 @@ rm(versions)
 
 ```
 
-## Data analysis
+## Data QC
+11/17/2025
 -KALRN #7-21 & #7-22 were not amplified (no primer added)
+-Primers to potentially re-evaluate: AKT3, ATG4B, CBARP, INTS8, *ITGA7*, MADD, *MAST1*, *PHF2*, PKN1, NSMCE4A, RAP1GAP, ZNF23
 
 ```{r DataQC}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi")
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
 data <- read_csv("data/251117_qPCR_data.csv") %>% 
   filter(!is.na(Primers)) 
-shRNA_key <- read_xlsx("data/250904_NMD_RNA.xlsx", sheet = 2) %>% 
-  filter(RNAisolate == "Y")%>% 
-  dplyr::select(gene, `RNA ID#`, shRNA)
+shRNA_key <- read_xlsx("data/250905_qPCR_RNAs.xlsx", sheet = 1) %>% 
+  dplyr::select(gene, id, shRNA) %>% distinct()
   
 ## Test for primer failure?
 ## Couple with multiple peaks - perhaps re-test primers
+
+# PRIMERS: AKT3, ATG4B, CBARP, INTS8, ITGA7, MADD, MAST1, PKN1, NSMCE4A, RAP1GAP, ZNF23
 m <- as.matrix(table(paste0(data$Target[which(!is.na(data$Tm2))], " KD"),data$Primers[which(!is.na(data$Tm2))]))
 pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
 
@@ -53,7 +56,7 @@ pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = m
 
 ## Remove failed experiments
 data <- data %>% filter(CT != "Undetermined", !(SampleID %in% c("#7-21", "#7-22"))) %>%
-  left_join(shRNA_key, by = join_by(SampleID == `RNA ID#`, Target == gene))
+  left_join(shRNA_key, by = join_by(SampleID == id, Target == gene))
 
 ## Calculate average CT and sd of CT
 data_grouped <- data %>% group_by(Target,shRNA, SampleID, Primers) %>% 
@@ -61,18 +64,6 @@ data_grouped <- data %>% group_by(Target,shRNA, SampleID, Primers) %>%
             ct_diff=abs(as.numeric(list(CT)[1][[1]][1])-as.numeric(list(CT)[1][[1]][2])),
             avgCT = round(mean(as.numeric(CT)),2), 
             sdCT = round(sd(as.numeric(CT)), 2))
-
-data_grouped %>% mutate(key = paste0(Target, "_", shRNA)) %>% 
-  filter(Target != "TARDBP") %>%
-  ggplot(aes(x=key, y=Primers, fill=sdCT)) +
-  geom_tile(color="black")  + 
-  scale_fill_viridis(option = "B")+ xlab("KDTarget_shRNA")+
-  theme_classic() + ylab("STDEV of CT")+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-        axis.ticks = element_blank(),
-        axis.line = element_blank()) +
-  scale_x_discrete(expand=c(0,0)) + 
-  scale_y_discrete(expand=c(0,0))
 
 data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
@@ -83,7 +74,9 @@ data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_x_discrete(expand=c(0,0)) + 
   scale_y_continuous(expand=c(0,0), lim=c(0,6)) +
-  geom_hline(yintercept = 0.5, linetype="dotted")
+  geom_hline(yintercept = 0.5, linetype="dotted") +
+  coord_fixed(ratio = 5) + 
+  labs(title = "All experiments")
 
 data_grouped %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
   ggplot(aes(x=Primers, y = ct_diff, fill = SampleID))+
@@ -93,7 +86,9 @@ data_grouped %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_x_discrete(expand=c(0,0)) + 
   scale_y_continuous(expand=c(0,0), lim=c(0,1)) +
-  geom_hline(yintercept = 0.5, linetype="dotted")
+  geom_hline(yintercept = 0.5, linetype="dotted") + 
+  coord_fixed(ratio = 20) + 
+  labs(title = "Ctrl and TDP-43 KD samples")
   
 data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
@@ -104,9 +99,48 @@ data_grouped %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   geom_abline(slope=1, intercept=0.5, linetype="dotted")+
   geom_text_repel(aes(label=ifelse(ct_diff>0.5,SampleID,"")),
                   size=3,min.segment.length = 0,
-                  max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")
+                  max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")+
+  coord_fixed(ratio = 1) 
+
+## Re-do samples with CT difference > 0.5
 potentialRedos <- (data_grouped %>% filter(ct_diff > 0.5))$SampleID
 
+```
+
+12/18/2025
+```{r data_qc2}
+data_2 <- readxl::read_xlsx("data/251218_qPCR_Calculations.xlsx")
+
+## Test for primer failure?
+# Potential primer failures: MAST1, ITGA7, MADD, NSMCE4A, EXD3, DAPK1, CYFIP2, CBARP
+# Gel compared, potential failures: NSMCE4A, EXD3 (very light) -> okay in WT?
+# Re-design: NSMCE4A
+m <- as.matrix(table(paste0(data_2$Target[which(!is.na(data_2$Tm2))], " KD"),data_2$Primers[which(!is.na(data_2$Tm2))]))
+pheatmap(m,cluster_rows = F, cluster_cols = F, border_color = "white", color = magma(n=100))
+
+## Calculate average CT and sd of CT
+data_2 <- data_2 %>% filter(CT != "Undetermined", AMPStatus_Score == "Amp") %>%
+  left_join(shRNA_key, by = join_by(SampleID == id, Target == gene))
+data_2_grouped <- data_2 %>% group_by(Target,shRNA, SampleID, Primers) %>% 
+  summarize(ct1 = as.numeric(list(CT)[1][[1]][1]), ct2=as.numeric(list(CT)[1][[1]][2]),
+            ct_diff=abs(as.numeric(list(CT)[1][[1]][1])-as.numeric(list(CT)[1][[1]][2])),
+            avgCT = round(mean(as.numeric(CT)),2), 
+            sdCT = round(sd(as.numeric(CT)), 2))
+
+# Recalc sd for samples with 4 trials
+merge_df <- full_join(data_grouped[,1:6], data_2_grouped[,1:6], by = c("Target","shRNA","SampleID","Primers"), suffix = c("_1","_2")) %>%
+  rowwise() %>% mutate(avg_overall = mean(c(ct1_1, ct2_1,ct1_2, ct2_2), na.rm = T),
+                       sd_overall = sd(c(ct1_1, ct2_1,ct1_2, ct2_2), na.rm = T))
+
+
+
+
+```
+
+
+
+
+```{r ddct}
 ## Calculate -ddCT for okay samples
 calculate_df_Ctrl <- data_grouped %>% 
   filter(SampleID == "Ctrl") %>% ungroup() %>%
@@ -162,8 +196,4 @@ calculate_df_kds %>%
         strip.background = element_rect(fill="#B0DAF1", color="#B0DAF1"),
         strip.text = element_text(face="bold"),
         legend.position = "none")
-
-
-
-
 ```
