@@ -1,0 +1,183 @@
+---
+title: "251220_lc"
+author: "Irika Sinha"
+date: "2025-12-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load packages
+
+```{r packages, warning=FALSE}
+library("BiocManager")
+packages <- c("tidyverse", "data.table")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  } 
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+## Load files
+
+df: degrees of freedom, equal to the number of introns in the cluster minus one (assuming two groups)
+groups should generally have 3 (cassette CE) introns, but with some additional differential splicing (slight shifts or messy splicing) might have up to 12 or 15? but this is only if there are many CEs within the same intron. df >= 2 if there is at least one alternate intron
+
+```{r files}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
+cryptic_df <- fread("data/250601_CE_table.csv")
+
+## Load LC output
+sample_groups <- fread("data/Leafcutter/251220_sample_groups.csv")
+knitr::kable(sample_groups)
+
+## Load in all LC files
+lc_df <- data.frame()
+
+for(i in seq(1,9)){
+  ## Load in both files and subset to significant events
+  lc_df_sig <- fread(paste0("data/Leafcutter/group",i,"_cluster_significance.txt")) %>%
+    filter(status == "Success")
+  lc_df_sizes <- fread(paste0("data/Leafcutter/group",i,"_effect_sizes.txt")) %>%
+    mutate(cluster = paste0(str_split_i(intron,":",1),":",str_split_i(intron,":",4))) 
+  
+  ## Merge files for each group
+  colnames(lc_df_sizes)[3:4] <- c("group1", "group2")
+  lc_df_sizes <- right_join(lc_df_sizes, lc_df_sig, by = "cluster") %>% 
+    mutate(run = i,
+           intronMod = paste0(str_split_i(intron,":",1),":",
+                              str_split_i(intron,":",2),"-", 
+                              str_split_i(intron,":",3))) %>% 
+    dplyr::select(c(run, cluster, intronMod, group1, group2, df, deltapsi, p.adjust, genes))
+  
+  ## Add to overall df
+  lc_df <- rbind(lc_df, lc_df_sizes)
+  rm(lc_df_sig, lc_df_sizes,i)
+}
+
+# saveRDS(lc_df, "output_tables/251220_leafcutterResults.RDS")
+
+```
+
+## ID'ed CE padj
+```{r matchCE}
+ce_junctions <- data.frame(junctions = unlist(str_split(c(cryptic_df$LeftJunction,cryptic_df$RightJunction),";"))) %>%
+  filter(junctions != "NA") %>%
+  mutate(chr = str_split_i(junctions, ":",1),
+         coor = str_split_i(junctions, ":",2),
+         start = as.numeric(str_split_i(coor, "-",1)),
+         end = as.numeric(str_split_i(coor, "-",2)),
+         lc_coord = paste0(chr,":", start-1, "-", end+1))
+
+lc_df_subset <- lc_df %>% filter(intronMod %in% ce_junctions$lc_coord)
+
+ce_df <- cryptic_df[,c(1:6,18,19)] %>% mutate(L_padj_TDPvCtrl = NA, R_padj_TDPvCtrl=NA,
+                                              L_padj_TDPvTXUTXS = NA, R_padj_TDPvTXUTXS=NA)
+
+for(i in 1:nrow(ce_df)){
+  ## Left 1
+  if(!is.na(ce_df$LeftJunction[i])){
+    junctions <- unlist(str_split(ce_df$LeftJunction[i],";"))
+    junctions <- ce_junctions$lc_coord[which(ce_junctions$junctions %in% junctions)]
+    df <- lc_df_subset %>% filter(intronMod %in% junctions, run == 1)
+  
+    if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$L_padj_TDPvCtrl[i] = str_flatten_comma(df$p.adjust)
+    } else{
+      ce_df$L_padj_TDPvCtrl[i] = "not calculated"
+    }
+    
+    df <- lc_df_subset %>% filter(intronMod %in% junctions, run == 5)
+    if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$L_padj_TDPvTXUTXS[i] = str_flatten_comma(df$p.adjust)
+    } else{
+      ce_df$L_padj_TDPvTXUTXS[i] = "not calculated"
+    }
+  }
+  
+  
+  ## Right 2
+  if(!is.na(ce_df$RightJunction[i])){
+    junctions <- unlist(str_split(ce_df$RightJunction[i],";"))
+    junctions <- ce_junctions$lc_coord[which(ce_junctions$junctions %in% junctions)]
+    df <- lc_df_subset %>% filter(intronMod %in% junctions, run == 1)
+  
+    if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$R_padj_TDPvCtrl[i] = str_flatten_comma(df$p.adjust)
+    } else{
+      ce_df$R_padj_TDPvCtrl[i] = "not calculated"
+    }
+    
+    df <- lc_df_subset %>% filter(intronMod %in% junctions, run == 5)
+    if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$R_padj_TDPvTXUTXS[i] = str_flatten_comma(df$p.adjust)
+    }  else{
+      ce_df$R_padj_TDPvTXUTXS[i] = "not calculated"
+    }
+  }
+  
+  rm(i, df)
+}
+
+# write.csv(ce_df,"output_tables/251221_LC_sig.csv")
+
+
+```
+
+
+## Find un-identified events (mainly skiptic)
+1) Main groups will be group 1, group
+```{r filtersNew}
+lc_df <- readRDS("output_tables/251220_leafcutterResults.RDS") %>% 
+  filter(p.adjust < 0.05 & df > 1,
+         deltapsi/group1 > 0.3, str_detect(genes,",", negate=T),
+        !(run %in% c(2,3,5,6))) # g2 expression should be at least 30% more
+
+ctrlIntrons <- unique((lc_df %>% filter(run == 8))$intronMod)
+
+# Look for any missed CEs
+lc_df_tabulate <- lc_df  %>%
+  filter(ifelse(run %in% c(1,4,7,9), group1 < 0.10, group2/group1 > 0.2 ),
+         run != 7) %>%
+  group_by(intronMod, genes) %>%
+  summarize(runs = str_flatten_comma(c(run)), 
+            maxdPSI = round(max(deltapsi),2), # Identify max dPSI between g1 and g2 for each intron
+            max1PSI = max(group1), # Identify max PSI of g1 for each intron
+            max2PSI = round(max(group2),2)) %>% # Identify max PSI of g2 for each intron
+  filter(str_detect(runs,","), # Should be identified in multiple groupings
+         str_detect(runs,"1"), # Should be identified in all KD vs all ctrl
+         ifelse(str_detect(runs,"9"), str_detect(runs,"(4|7)+"),str_detect(runs,"4|7")),
+         maxdPSI > 0.01, # g1 vs g2 PSIs should be at least 1% different
+         max2PSI > 0.2, # g2 PSI should be greater than 1%
+         !(intronMod %in% ctrlIntrons)
+         ) 
+
+new_df <- lc_df_tabulate %>% filter(!(intronMod %in% lc_df_subset$intronMod)) %>%
+  mutate(order = maxdPSI/(max1PSI + 0.01) )
+
+# write.csv(new_df,"output_tables/251221_LC_new.csv")
+
+
+
+```
+
+
+
