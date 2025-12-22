@@ -91,8 +91,8 @@ lc_df <- lc_df %>% filter(!(intronMod %in% (lc_df %>% filter(run == 8))$intronMo
 lc_df_1 <- lc_df %>% filter(run == 1) %>%
   group_by(genes, cluster, p.adjust) %>%
   summarize(max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
-            nIntrons = n(),
-            introns = str_flatten_comma(intronMod),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(intronMod)),
             group1_PSIs = str_flatten_comma(signif(group1,3)),
             group2_PSIs = str_flatten_comma(signif(group2,3)),
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
@@ -102,8 +102,8 @@ lc_df_1 <- lc_df %>% filter(run == 1) %>%
 lc_df_2 <- lc_df %>% filter(run == 9) %>%
   group_by(genes, cluster, p.adjust) %>%
   summarize(max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
-            nIntrons = n(),
-            introns = str_flatten_comma(intronMod),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(intronMod)),
             group1_PSIs = str_flatten_comma(signif(group1,3)),
             group2_PSIs = str_flatten_comma(signif(group2,3)),
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
@@ -114,8 +114,8 @@ lc_df_3 <- lc_df %>% filter(run == 2,
                             !(intronMod %in% (lc_df %>% filter(run == 9))$intronMod)) %>% # Events not identified by TDP-43 kd only
   group_by(genes, cluster, p.adjust) %>%
   summarize(max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
-            nIntrons = n(),
-            introns = str_flatten_comma(intronMod),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(intronMod)),
             group1_PSIs = str_flatten_comma(signif(group1,3)),
             group2_PSIs = str_flatten_comma(signif(group2,3)),
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
@@ -128,15 +128,15 @@ lc_df_4 <- lc_df %>% filter(run == 3,
                             (intronMod %in% (lc_df %>% filter(run == 4))$intronMod)) %>% # Events included in TXU vs CXU
   group_by(genes, cluster, p.adjust) %>%
   summarize(max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
-            nIntrons = n(),
-            introns = str_flatten_comma(intronMod),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(intronMod)),
             group1_PSIs = str_flatten_comma(signif(group1,3)),
             group2_PSIs = str_flatten_comma(signif(group2,3)),
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
   dplyr::arrange(desc(max_pctDiff))
 
 # Save file
-# writexl::write_xlsx(list(ST1 = lc_df_1, ST2 = lc_df_2, ST3 = lc_df_3, ST4 = lc_df_4), 
+# writexl::write_xlsx(list(ST1 = lc_df_1, ST2 = lc_df_2, ST3 = lc_df_3, ST4 = lc_df_4),
 #                     path = "output_tables/251222_LC_ST.xlsx")
 
 
@@ -227,15 +227,19 @@ lc_df <- readRDS("output_tables/251220_leafcutterResults.RDS") %>%
   mutate(p.adjust = signif(p.adjust,3))
 
 lc_df <- lc_df  %>% filter(!(intronMod %in% (lc_df %>% filter(run == 8))$intronMod),
-                           !(intronMod %in% lc_df_subset$intronMod)) # Removes identified
+                           !(intronMod %in% lc_df_subset$intronMod)) %>% # Removes identified
+  mutate(JLcoord = paste0(str_split_i(intronMod,":",1),":",
+                          as.numeric(str_split_i(str_split_i(intronMod,":",2), "-",1)) +1,"-",
+                          as.numeric(str_split_i(str_split_i(intronMod,":",2), "-",2))-1
+                          ))
 
 lc_df_tabulate <- lc_df  %>% 
   group_by(genes, cluster) %>%
   summarize(runs = str_flatten_comma(c(run)),
             maxdPSI = signif(max(deltapsi),3),
             max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
-            nIntrons = n(),
-            introns = str_flatten_comma(intronMod),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(JLcoord)),
             group1_PSIs = str_flatten_comma(signif(group1,3)),
             group2_PSIs = str_flatten_comma(signif(group2,3)),
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
