@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r packages, warning=FALSE}
 library("BiocManager")
-packages <- c("tidyverse", "data.table")
+packages <- c("tidyverse", "data.table", "biomaRt")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -212,6 +212,57 @@ for(i in 1:nrow(ce_df)){
 }
 
 # write.csv(ce_df,"output_tables/251221_LC_sig.csv")
+
+### SKIPTIC exons
+skiptic_df <- fread("data/251223_skipticdf.csv")
+
+# Add strands
+mart <- useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+info <- getBM(attributes = c("ensembl_gene_id", "external_gene_name","strand", "gene_biotype"), 
+              filters = "ensembl_gene_id", values = skiptic_df$`Ensembl ID`, mart = mart) %>%
+  mutate(strand = ifelse(strand == -1, "-","+"))
+
+# Isolate junctions from identified CEs and re-format for LC
+ce_junctions <- data.frame(ensembl_gene_id = skiptic_df$`Ensembl ID`,junctions = skiptic_df$`Skyptic Junction`) %>%
+  mutate(chr = str_split_i(junctions, ":",1),
+         coor = str_split_i(junctions, ":",2),
+         start = as.numeric(str_split_i(coor, "-",1)),
+         end = as.numeric(str_split_i(coor, "-",2)),
+         lc_coord = paste0(chr,":", start-1, "-", end+1)) %>%
+  left_join(info, by = "ensembl_gene_id")
+
+# Subset LC results to junctions of interest
+lc_df_subset <- lc_df %>% filter(intronMod %in% ce_junctions$lc_coord) %>%
+  mutate(strand = str_split_i(cluster,"_",3))
+
+# Create new dataframe and populate with p-values for TDPvsCtrland TXU+TXS vs TDP43 kd only
+ce_df <- skiptic_df[,c(1:5)] %>% mutate(padj_TDPvCtrl = NA, padj_TDPvTXUTXS = NA)
+
+for(i in 1:nrow(ce_df)){
+  junctions <- ce_df$`Skyptic Junction`[i]
+  readStrand <- ifelse(ce_junctions$strand[i] == "-","+","-")
+  junctions <- ce_junctions$lc_coord[which(ce_junctions$junctions %in% junctions)]
+  df <- lc_df_subset %>% filter(intronMod %in% junctions, strand == readStrand, run == 1)
+  
+  if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$padj_TDPvCtrl[i] = str_flatten_comma(df$p.adjust)
+    } else{
+      ce_df$padj_TDPvCtrl[i] = "not calculated"
+    }
+    
+  df <- lc_df_subset %>% filter(intronMod %in% junctions, strand == readStrand, run == 5)
+    if(nrow(df) >= 1){
+      df$p.adjust = signif(df$p.adjust, digits=3)
+      ce_df$padj_TDPvTXUTXS[i] = str_flatten_comma(df$p.adjust)
+    } else{
+      ce_df$padj_TDPvTXUTXS[i] = "not calculated"
+    }
+  
+  rm(i, df)
+}
+
+# write.csv(ce_df,"output_tables/251221_LC_sig_skiptic.csv")
 
 
 ```
