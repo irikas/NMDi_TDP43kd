@@ -221,8 +221,7 @@ for(i in 1:nrow(ce_df)){
 
 ```{r filtersNew}
 lc_df <- readRDS("output_tables/251220_leafcutterResults.RDS") %>% 
-  filter(p.adjust < 0.05,
-         group1 < 0.05, group2 > 0.1,  df > 1, !is.na(genes),
+  filter(p.adjust < 0.05, group1 < 0.1, group2 > 0.1,  df > 1, !is.na(genes),
          (run %in% c(1,3, 4,9))) %>% # Filters for upper cut-off (g1) and lower cut-off (g2)
   mutate(p.adjust = signif(p.adjust,3))
 
@@ -245,11 +244,27 @@ lc_df_tabulate <- lc_df  %>%
             d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
   dplyr::arrange(desc(max_pctDiff)) %>%
   filter(runs != "3",maxdPSI > 0.1,
-         ifelse(str_detect(runs,"9"), str_detect(runs,"(4|7)+"),str_detect(runs,"1|3|4")), # If detected in TDP-43 only, should be detected in NMDi conditions
-         ifelse(str_detect(runs,"4"), str_detect(runs,"3"),str_detect(runs,"1"))) # I
+         ifelse(str_detect(runs,"9"), str_detect(runs,"4"),str_detect(runs,"1|3|4")), # If detected in TDP-43 only, should be detected in NMDi conditions
+         str_detect(runs,"1"), max_pctDiff > 10)
 
- # write.csv(lc_df_tabulate,"output_tables/251221_LC_new.csv")
+## HIGH
+lc_df_tabulate2 <- lc_df  %>% 
+  filter(!(cluster %in% lc_df_tabulate$cluster)) %>%
+  group_by(genes, cluster) %>%
+  summarize(runs = str_flatten_comma(c(run)),
+            maxdPSI = signif(max(deltapsi),3),
+            max_pctDiff = signif(max(deltapsi/(group1+0.01)),3),
+            nIntrons = length(unique(intronMod)),
+            introns = str_flatten_comma(unique(JLcoord)),
+            group1_PSIs = str_flatten_comma(signif(group1,3)),
+            group2_PSIs = str_flatten_comma(signif(group2,3)),
+            d_PSIs = str_flatten_comma(signif(deltapsi,3))) %>%
+  filter(maxdPSI > 0.3,runs != "3") %>%
+  dplyr::arrange(desc(max_pctDiff))
 
+df <- rbind(lc_df_tabulate, lc_df_tabulate2) %>% dplyr::arrange(desc(max_pctDiff))
+
+ # write.csv(df,"output_tables/251221_LC_new.csv")
 
 
 ```
