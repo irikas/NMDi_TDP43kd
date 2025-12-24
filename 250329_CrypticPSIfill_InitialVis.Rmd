@@ -15,8 +15,10 @@ The purpose of this script is to take the file with manually identified cryptic 
 
 ## Packages
 
+Load packages
+
 ```{r packages}
-CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","pheatmap")
+CRANpackages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager","viridis","pheatmap","readxl", "data.table")
 
 for(i in CRANpackages){
   if(!(i %in% rownames(installed.packages()))){
@@ -30,44 +32,62 @@ for(i in CRANpackages){
 
 ```
 
-## Merge sj files together
+## Create a dataframe of splice junction counts
+.sj files generated from STAR alignment of reads and include splice junction information for each sample.
+Create a new dataframe with splice junction counts from each sample for relevant junctions
 
 ```{r mergeSJ, eval=FALSE}
 ### Load cryptic files
-cryptic_df <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250325_NMDi/2025_NMDiPaper/data/250601_CE_table.csv")[1:19]
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2)[,1:19]
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3)[,1:5]
 
-# Clean up junctions
+## Clean up junctions - cryptic_df
 for(i in c(5:6,18:19)){
   cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = ",", replacement = "", x = x))
   cryptic_df[,i] = apply(cryptic_df[,i],2,function(x) gsub(pattern = " ", replacement = "", x = x))
   rm(i)
 }
-uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
-                         cryptic_df$LeftJunction, cryptic_df$RightJunction))
+
+## Clean up junctions - skiptic_df
+for(i in c(3:5)){
+  skiptic_df[,i] = apply(skiptic_df[,i],2,function(x) gsub(pattern = ",", replacement = "", x = x))
+  skiptic_df[,i] = apply(skiptic_df[,i],2,function(x) gsub(pattern = " ", replacement = "", x = x))
+  rm(i)
+}
+
+## Create a list of unique junctions being queried
+uniqueJunctions = unique(c(cryptic_df$canonical_splice_junction, 
+                         cryptic_df$left_junction, cryptic_df$right_junction,
+                         skiptic_df$left_canonical_junction, skiptic_df$right_canonical_junction,
+                         skiptic_df$skiptic_junction))
 uniqueJunctions = unlist(as.list(str_split(uniqueJunctions,";")))
 
-### Create empty dataframe
+## Create empty dataframe to populate with splice junction counts
 finaldf <- data.frame()
 
-### Load .sj files
+## Load .sj files and merge into one large data frame
+# Filter to splice junctions being queried
 sj_wd <- "/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/250106_CrypticCoordinateFill/SJfiles/"
 
 for(i in list.files(sj_wd)){
   condName = gsub(pattern=".sj",replacement="",x = i)
-  tempdf <- read_delim(paste0(sj_wd,i),col_names =F,lazy = T) %>% mutate(Condition = condName,
-                                                                     Coordinates = paste0(X1,":",X2,"-",X3)) %>%
+  tempdf <- fread(paste0(sj_wd,i)) %>% 
+    mutate(Condition = condName,
+           Coordinates = paste0(V1,":",V2,"-",V3)) %>%
     filter(Coordinates %in% uniqueJunctions)
-  finaldf <- rbind(finaldf,tempdf,col_names = F)
+  
+  finaldf <- rbind(finaldf,tempdf)
   rm(i,condName,tempdf)
 }
 
+## Isolate needed columns & Rename appropriately
 finaldf <- cbind(finaldf, apply(tibble(finaldf$Condition),MARGIN = 2, 
                           function(x) str_split_i(string = x, pattern = "[:digit:]",i=1)))
 finaldf <- finaldf %>% dplyr::select(!Condition)
-finaldf <- finaldf[4:11] %>% relocate(Coordinates, .before=1)
+finaldf <- finaldf[,4:11] %>% relocate(Coordinates, .before=1)
 colnames(finaldf)[2:8] <- c("Strand","IntronMotif","Annotated","UniqueMap","MultiMap","MaxOverhang","Condition")
 
-
+## Redefine strand and intron motif as per reference
 finaldf <- finaldf %>% dplyr::select(!Annotated) %>% 
   mutate(Strand = ifelse(Strand == 1, "+", ifelse(Strand == 2, "-","Undef"))) %>%
   mutate(IntronMotif = ifelse(IntronMotif == 0, "noncanonical",
@@ -77,115 +97,145 @@ finaldf <- finaldf %>% dplyr::select(!Annotated) %>%
                                                    ifelse(IntronMotif == 4, "CT/GC",
                                                           ifelse(IntronMotif == 5, "AT/AC",
                                                                  ifelse(IntronMotif == 6, "GT/AT", "noncanonical"))))))))
+## Reframe dataframe
 finaldf <- finaldf %>% filter(Condition != "FALSE") %>% 
-  pivot_wider(names_from = "Condition", 
-              values_from = "UniqueMap", 
-              values_fn = function(x) mean(x, na.rm=T), 
+  pivot_wider(names_from = "Condition", # Each column is a treatment
+              values_from = "UniqueMap", # Values are the # of splice junction counts
+              values_fn = function(x) mean(x, na.rm=T),  # Average splice junction counts between duplicates
               id_cols = "Coordinates")
 
-write.csv(finaldf,"output_tables/250602_1_SpliceJunctions_Cleaned.csv",row.names = F)
-write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"output_tables/250601_TestJunctions.csv")
+# write.csv(finaldf,"output_tables/251224_SpliceJunctions_Cleaned.csv",row.names = F)
+# write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"output_tables/251224_TestJunctions.csv")
 ```
 
+## Calculate the PSI
+
+
+
 ```{r calcPSI, eval=FALSE}
-junctionCountdf <- read_delim("output_tables/250602_1_SpliceJunctions_Cleaned.csv")
+junctionCountdf <- fread("output_tables/251224_SpliceJunctions_Cleaned.csv")
 
-uniqueJunctions = unique(c(cryptic_df$`Canonical Splice Junction`, 
-                         cryptic_df$LeftJunction, cryptic_df$RightJunction))
-uniqueJunctions = unlist(as.list(str_split(cryptic_df$LeftJunction,";")))
-
+## Create new dataframe to populate with splice junction counts: cryptic exons
 cryptic_df_fill = cryptic_df
-cryptic_df_fill[,20:41] = NA
-colnames(cryptic_df_fill)[20:30] = paste0("LPSI_",colnames(junctionCountdf)[2:12])
-colnames(cryptic_df_fill)[31:41] = paste0("RPSI_",colnames(junctionCountdf)[2:12])
+cryptic_df_fill[,20:30] = NA
+colnames(cryptic_df_fill)[20:30] = paste0("avgPSI_",colnames(junctionCountdf)[2:12])
 
 for(i in 1:nrow(cryptic_df_fill)){
   ### LPSI 
-  if(!is.na(cryptic_df_fill$LeftJunction[i])){
+  if(!is.na(cryptic_df_fill$left_junction[i])){
     # Identify inclusion Counts
-    incJunc = unlist(as.list(str_split(cryptic_df_fill$LeftJunction[i],";")))
+    incJunc = unlist(as.list(str_split(cryptic_df_fill$left_junction[i],";")))
     incdf = junctionCountdf[which(junctionCountdf$Coordinates %in% incJunc),] %>% 
       dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
     incdf[is.na(incdf)] = 0
     
     # Identify exclusion counts
-    excJunc = unlist(as.list(str_split(cryptic_df_fill$`Canonical Splice Junction`[i],";")))
+    excJunc = unlist(as.list(str_split(cryptic_df_fill$canonical_splice_junction[i],";")))
     excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% excJunc),] %>% 
       dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
     excdf[is.na(excdf)] = 0
     
     # Calculate PSI
-    psiCount = round((incdf/(excdf+incdf))*100,1)
-    cryptic_df_fill[i,20:30] = t(as.matrix(psiCount))
+    psiCount_L = round((incdf/(excdf+incdf))*100,1)
+    # cryptic_df_fill[i,20:30] = t(as.matrix(psiCount))
   }
   
   ### RPSI 
-  if(!is.na(cryptic_df_fill$RightJunction[i])){
+  if(!is.na(cryptic_df_fill$right_junction[i])){
     # Identify inclusion Counts
-    incJunc = unlist(as.list(str_split(cryptic_df_fill$RightJunction[i],";")))
+    incJunc = unlist(as.list(str_split(cryptic_df_fill$right_junction[i],";")))
     incdf = junctionCountdf[which(junctionCountdf$Coordinates %in% incJunc),] %>% 
       dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
     incdf[is.na(incdf)] = 0
     
     # Identify exclusion counts
-    excJunc = unlist(as.list(str_split(cryptic_df_fill$`Canonical Splice Junction`[i],";")))
+    excJunc = unlist(as.list(str_split(cryptic_df_fill$canonical_splice_junction[i],";")))
     excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% excJunc),] %>% 
       dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
     excdf[is.na(excdf)] = 0
     
     # Calculate PSI
-    psiCount = round((incdf/(excdf+incdf))*100,1)
-    cryptic_df_fill[i,31:41] = t(as.matrix(psiCount))
+    psiCount_R = round((incdf/(excdf+incdf))*100,1)
+    # cryptic_df_fill[i,31:41] = t(as.matrix(psiCount))
   } 
+  
+  if(length(psiCount_L) > 0){
+    psiCount_L <- as.numeric(str_replace_na(psiCount_L, replacement="0"))
+    if(length(psiCount_R) > 0){
+      psiCount_R <- as.numeric(str_replace_na(psiCount_R, replacement="0"))
+      psiCount = (psiCount_L + psiCount_R)/2
+      cryptic_df_fill[i,20:30] = t(as.matrix(psiCount))
+    } else{
+      cryptic_df_fill[i,20:30] = t(as.matrix(psiCount_L))
+    } 
+  } else{
+    psiCount_R <- as.numeric(str_replace_na(psiCount_R, replacement="0"))
+    cryptic_df_fill[i,20:30] = t(as.matrix(psiCount_R))
+  }
+  
 }
 
-cryptic_df_fill <- cryptic_df_fill %>% arrange(`Gene Symbol`) %>% filter(!(`Gene Symbol` %in% c("GDAP1L1")))
-cryptic_df_fill$`ID #` <- paste0("CE", sprintf("%03d", 1:421))
-# write.csv(cryptic_df_fill,"output_tables/250602_CrypticCoordinates.csv", row.names = F)
+cryptic_df_fill <- cryptic_df_fill %>% arrange(canonical_splice_junction) %>% arrange(cryptic_exon_coordinates) %>% arrange(gene_symbol) 
+cryptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 1:422))
+# write.csv(cryptic_df_fill,"output_tables/251224_CrypticCoordinates.csv", row.names = F)
+
+## Create new dataframe to populate with splice junction counts: SKIPTIC exons
+skiptic_df_fill = skiptic_df
+skiptic_df_fill[,6:16] = NA
+colnames(skiptic_df_fill)[6:16] = paste0("avgPSI_",colnames(junctionCountdf)[2:12])
+
+for(i in 1:nrow(skiptic_df_fill)){
+  ### Identify inclusion Counts (skiptic)
+  incJunc = skiptic_df_fill$skiptic_junction[i]
+  incdf = junctionCountdf[which(junctionCountdf$Coordinates %in% incJunc),] %>% 
+    dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+  incdf[is.na(incdf)] = 0
+    
+  ### Left canonical junction counts
+  L_excJunc = skiptic_df_fill$left_canonical_junction[i]
+  L_excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% L_excJunc),] %>% 
+    dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+  L_excdf[is.na(L_excdf)] = 0
+  
+  ### Right canonical junction counts
+  R_excJunc = skiptic_df_fill$right_canonical_junction[i]
+  R_excdf = junctionCountdf[which(junctionCountdf$Coordinates %in% R_excJunc),] %>% 
+    dplyr::select(!Coordinates) %>% apply(2,function(x) sum(x,na.rm=T))
+  R_excdf[is.na(R_excdf)] = 0
+  
+  # Calculate PSI
+  psi_L = round((incdf/(L_excdf+incdf))*100,1)
+  psi_R = round((incdf/(R_excdf+incdf))*100,1)
+  avgPSI = (psi_L + psi_R)/2
+  skiptic_df_fill[i,6:16] = t(as.matrix(avgPSI))
+  
+}
+
+skiptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 423:432))
+# write.csv(skiptic_df_fill,"output_tables/251224_SkipticCoordinates.csv", row.names = F)
 
 ```
 
+
+## Create Summary columns
+Find rowwise means/avgs per condition, etc.
+
 ```{r SummaryColumns}
-cryptic_df <- read_delim("output_tables/250602_CrypticCoordinates.csv")
+## Create one table with only gene symbol, ensembl id, ce id, and PSIs
+cryptic_df_fill_subset <- cryptic_df_fill %>% 
+  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
+skiptic_df_fill_subset <- skiptic_df_fill %>%
+  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
 
-for(i in 20:41){
-  cryptic_df[which(cryptic_df[,i] == "NaN"),i] = NA
-  rm(i)
-}
-
-# Add control avg
-cond = unique(str_split_i(colnames(cryptic_df)[20:41],"_",2))
-cryptic_df$avgCtrl = round(apply(cryptic_df %>% dplyr::select(LPSI_C,RPSI_C,LPSI_SgC,RPSI_SgC), 1, 
-                                    function(x) mean(x, na.rm=T)),1)
-
-# Add shTDP avg
-cryptic_df$avgT = round(apply(cryptic_df %>% dplyr::select(LPSI_T,RPSI_T), 1, 
-                                    function(x) mean(x, na.rm=T)),1)
-# Add condition avg
-for(i in cond[-c(1,6:7)]){
-  cryptic_df$newAvg = round(apply(cryptic_df %>% dplyr::select(contains(paste0("_",i))), 1, 
-                                  function(x) mean(x, na.rm=T)),1)
-  colnames(cryptic_df)[ncol(cryptic_df)] = paste0("avg",i)
-  rm(i)
-}
+df <- rbind(cryptic_df_fill_subset,skiptic_df_fill_subset)
+df[is.na(df)] = 0
 
 # Add max
-cryptic_df$maxCtrl = apply(cryptic_df %>% dplyr::select(contains("avgC")),1,function(x) max(x, na.rm=T))
-cryptic_df$maxTDP = apply(cryptic_df %>% dplyr::select(contains("avgT")),1,function(x) max(x, na.rm=T))
-cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
+df$maxCtrl = apply(df %>% dplyr::select(contains("avgPSI_C")),1,function(x) max(x, na.rm=T))
+df$maxTDP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
+df$maxDiff = df$maxTDP-df$maxCtrl
 
-# Modify Type
-# cryptic_df <- cryptic_df %>% mutate(cassette = 
-#                                       ifelse((is.na(`Start Site`) & is.na(PolyA) & is.na(`Exon Ext.`)), 
-#                                              "Y", NA)) %>% 
-#   pivot_longer(cols = c("Start Site", "PolyA", "Exon Ext.", "cassette"), 
-#                values_to = "val",values_drop_na = T, names_to = "type",names_transform = tolower) %>%
-#   relocate(type, .after = `Splice Site (L/R)`)
-
-cryptic_df <- cryptic_df %>% mutate(type=ifelse(type %in% c("polya","POLYA","polyA"),"polyA",type), 
-                                    `LEAKY/Weak` = ifelse(maxCtrl >= 20, "Y", "NA"))
-
- #write.csv(cryptic_df,"output_tables/250602_CrypticCoordinates_Fill.csv", row.names = F)
+# write.csv(df,"output_tables/251223_cetable_psi.csv", row.names = F)
 ```
 
 # Visualization
