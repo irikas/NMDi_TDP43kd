@@ -279,75 +279,77 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 ```
 
 ```{r VisPieChart}
+### Load cryptic files
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2)
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% mutate(type = "skiptic")
+
+# Set wd for new figures
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
-cryptic_df = read_delim("data/250601_CE_table.csv")
 
-pieChartFx(cryptic_df$type, cols = c("#002D72","#69140E","#F2F3AE","#82735C"))
-ggsave("output_fig/250602_CE_All.png",device = "png", 
+## Merge cryptic and skiptic dfs
+df <- rbind(cryptic_df %>% dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id,type, Inframe, starts_with("avgPSI"), starts_with("maxPSI")),
+                skiptic_df %>% dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id,type,Inframe, starts_with("avgPSI"), starts_with("maxPSI")))
+
+## Visualize overall characteristics in pie/donut chart form
+pieChartFx(df$type, cols = c("#002D72","#69140E","#F2F3AE","#587B7F","#82735C"))
+ggsave("output_fig/251224_CE_All.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$type)
+table(df$type)
 
-pieChartFx(cryptic_df$`Inf. Ins.`, naValue = T)
+pieChartFx(df$Inframe, cols = c("#262626","#D1D1D1"))
 ggsave("output_fig/250602_Pie_InFrame_CE.png",device = "png", 
        width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$`Inf. Ins.`)
-
-pieChartFx(cryptic_df$UTR, naValue = T)
-ggsave("output_fig/250329_Pie_UTR_CE.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$UTR)
-
-pieChartFx(cryptic_df$`Annotated Alternate Exon`, naValue = T)
-ggsave("output_fig/250329_Pie_AnnotatedAlt_CE.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
-table(cryptic_df$`Annotated Alternate Exon`)
+table(df$Inframe)
 
 # NMD reveal
-cryptic_df = read_delim("data/250601_CE_table.csv")
-cryptic_df <- cryptic_df %>% mutate(NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
-                                    NMDonly10pct = ifelse(avgT <= 10, "10pct", "TDPKDonly"),
-                                    NMDonly5pct = ifelse(avgT <= 5, "5pct", "TDPKDonly"),
-                                    NMDonly1pct = ifelse(avgT <= 1, "1pct", "TDPKDonly")) %>%
+df_NMD <- df %>% mutate(NMDonly10pct = ifelse(avgPSI_sgTARDBP <= 10, "10pct", "TDPKDonly"),
+                        NMDonly10pct = ifelse(avgPSI_sgTARDBP <= 10, "10pct", "TDPKDonly"),
+                        NMDonly5pct = ifelse(avgPSI_sgTARDBP <= 5, "5pct", "TDPKDonly"),
+                        NMDonly1pct = ifelse(avgPSI_sgTARDBP <= 1, "1pct", "TDPKDonly")) %>%
   pivot_longer(cols=c("NMDonly10pct","NMDonly5pct","NMDonly1pct"), 
                names_to = "NMDonly", values_to = "category",
                names_prefix = "NMDonly") %>% 
   mutate(category = ifelse(is.na(category), NMDonly, category),
          category = ifelse(category == "TDPKDonly","TDPKDonly","NMDi"),
          NMDonly = factor(NMDonly, c("10pct","5pct","1pct"))) 
-nmdOnlyCEs <- cryptic_df[which(cryptic_df$NMDonly == "1pct" & cryptic_df$category == "NMDi"),]
+nmdOnlyCEs <- df_NMD[which(df_NMD$NMDonly == "1pct" & df_NMD$category == "NMDi"),]
 
-table(cryptic_df$NMDonly, cryptic_df$category)
+table(df_NMD$NMDonly, df_NMD$category) 
 
-cryptic_df %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
+df_NMD %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
   theme_classic()+ xlab("") + ylab("# CEs") +
   theme(text = element_text(size = 14, family = "Helvetica"), 
         axis.ticks.x = element_blank(), 
         axis.title = element_text(size = 20, family = "Helvetica", color = "black")) +
   scale_y_continuous(expand = c(0, 0),limits = c(0,500))+
   scale_fill_manual(values = c("#D1D1D1","#262626"))
-ggsave("output_fig/250602_NMDi_Effect_PctCutoffs.png",device = "png", 
-       width = 30, height = 30, units = "cm",limitsize = FALSE)
 
 
 ### Plots to look at dPSI as a result of NMDi 
 ### Comparison to TDP-43 KD only
-cryptic_df_dNMD <- cryptic_df[,c(1:19,42:54)] %>% 
-  pivot_longer(20:30, names_to = "condition", names_prefix = "avg", values_to = "PSI")
-cryptic_df_dNMD_avgT <- cryptic_df_dNMD %>% filter(condition == "T")
-cryptic_df_dNMD_avgNMD <- cryptic_df_dNMD %>% filter(condition != "T") %>% 
+
+# Create new dataframe
+df_NMD <- df_NMD %>% dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id,type, Inframe, starts_with("avgPSI")) %>%
+  pivot_longer(starts_with("avgPSI"), names_to = "condition", names_prefix = "avgPSI_", values_to = "PSI")
+df_NMD_avgT <- df_NMD %>% filter(condition == "sgTARDBP")
+df_NMD_dNMD_avgNMD <- df_NMD %>% filter(condition != "sgTARDBP") %>% 
   mutate(facetCol = condition)
-cond <- unique(cryptic_df_dNMD$condition)
+cond <- unique(df_NMD$condition)
 
 for(i in cond){
-  cryptic_df_dNMD_avgNMD <- rbind(cryptic_df_dNMD_avgNMD, 
-                                  cryptic_df_dNMD_avgT %>% mutate(facetCol = i))
+  df_NMD_dNMD_avgNMD <- rbind(df_NMD_dNMD_avgNMD, 
+                                  df_NMD_avgT %>% mutate(facetCol = i))
   rm(i)
 }
 
-cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
-  mutate(facetCol = factor(facetCol, levels=c("TXS","TX","TUS","TXU"))) %>%
+df_NMD_dNMD_avgNMD %>% filter(str_detect(facetCol, "^sgTARDBP_")) %>%
+  mutate(facetCol = factor(facetCol, 
+                           levels=c("sgTARDBP_shXRN1/shSMG6",
+                                    "sgTARDBP_shXRN1",
+                                    "sgTARDBP_shUPF1/shSMG6",
+                                    "sgTARDBP_shXRN1/shUPF1"))) %>%
   ggplot(aes(x = condition, y = PSI)) +
-  geom_line(aes(group=`ID #`), alpha = 0.07) +
+  geom_line(aes(group=cryptic_exon_id), alpha = 0.07) +
   geom_boxplot(alpha=1, outliers = T, fill = c(rep(c("#444444","#D1D1D1"),4)), color = "black",
                outlier.color = "#444444",outlier.size = 5, linewidth = 3) +
   theme_classic()+ xlab("") + ylab("Average R/L PSI") +
@@ -358,10 +360,9 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-  #geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
   facet_wrap(~ facetCol, scales = "free_x", ncol = 4) 
-ggsave("output_fig/251212_NMDi_Effect_Paired.png",device = "png", 
-       width = 50, height = 40, units = "cm",limitsize = FALSE)
+# ggsave("output_fig/251224_NMDi_Effect_Paired.png",device = "png",
+#        width = 50, height = 40, units = "cm",limitsize = FALSE)
 
 
 cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
