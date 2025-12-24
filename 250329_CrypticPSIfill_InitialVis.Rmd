@@ -223,56 +223,19 @@ Find rowwise means/avgs per condition, etc.
 ```{r SummaryColumns}
 ## Create one table with only gene symbol, ensembl id, ce id, and PSIs
 cryptic_df_fill_subset <- cryptic_df_fill %>% 
-  dplyr::select(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avg_PSI"))
+  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
+skiptic_df_fill_subset <- skiptic_df_fill %>%
+  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
 
-
-
-
-
-
-
-
-
-
-
-for(i in 20:41){
-  cryptic_df[which(cryptic_df[,i] == "NaN"),i] = NA
-  rm(i)
-}
-
-# Add control avg
-cond = unique(str_split_i(colnames(cryptic_df)[20:41],"_",2))
-cryptic_df$avgCtrl = round(apply(cryptic_df %>% dplyr::select(LPSI_C,RPSI_C,LPSI_SgC,RPSI_SgC), 1, 
-                                    function(x) mean(x, na.rm=T)),1)
-
-# Add shTDP avg
-cryptic_df$avgT = round(apply(cryptic_df %>% dplyr::select(LPSI_T,RPSI_T), 1, 
-                                    function(x) mean(x, na.rm=T)),1)
-# Add condition avg
-for(i in cond[-c(1,6:7)]){
-  cryptic_df$newAvg = round(apply(cryptic_df %>% dplyr::select(contains(paste0("_",i))), 1, 
-                                  function(x) mean(x, na.rm=T)),1)
-  colnames(cryptic_df)[ncol(cryptic_df)] = paste0("avg",i)
-  rm(i)
-}
+df <- rbind(cryptic_df_fill_subset,skiptic_df_fill_subset)
+df[is.na(df)] = 0
 
 # Add max
-cryptic_df$maxCtrl = apply(cryptic_df %>% dplyr::select(contains("avgC")),1,function(x) max(x, na.rm=T))
-cryptic_df$maxTDP = apply(cryptic_df %>% dplyr::select(contains("avgT")),1,function(x) max(x, na.rm=T))
-cryptic_df$maxDiff = cryptic_df$maxTDP-cryptic_df$maxCtrl
+df$maxCtrl = apply(df %>% dplyr::select(contains("avgPSI_C")),1,function(x) max(x, na.rm=T))
+df$maxTDP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
+df$maxDiff = df$maxTDP-df$maxCtrl
 
-# Modify Type
-# cryptic_df <- cryptic_df %>% mutate(cassette = 
-#                                       ifelse((is.na(`Start Site`) & is.na(PolyA) & is.na(`Exon Ext.`)), 
-#                                              "Y", NA)) %>% 
-#   pivot_longer(cols = c("Start Site", "PolyA", "Exon Ext.", "cassette"), 
-#                values_to = "val",values_drop_na = T, names_to = "type",names_transform = tolower) %>%
-#   relocate(type, .after = `Splice Site (L/R)`)
-
-cryptic_df <- cryptic_df %>% mutate(type=ifelse(type %in% c("polya","POLYA","polyA"),"polyA",type), 
-                                    `LEAKY/Weak` = ifelse(maxCtrl >= 20, "Y", "NA"))
-
- #write.csv(cryptic_df,"output_tables/250602_CrypticCoordinates_Fill.csv", row.names = F)
+# write.csv(df,"output_tables/251223_cetable_psi.csv", row.names = F)
 ```
 
 # Visualization
