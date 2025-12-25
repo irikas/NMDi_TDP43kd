@@ -440,13 +440,13 @@ Use information from GTF file for Release 49 (GRCh38.p14) --> Basic gene annotat
 gencodeInformation <- rtracklayer::import("data/gencode.v49.basic.annotation.gtf")
 gencodeInformation <- gencodeInformation[gencodeInformation$type == "gene"]
 
-## Subset to unique genes
+## Subset to unique genes that are lncRNA, protein coding, or snRNA
 unique(gencodeInformation$gene_type)
 gencodeInformation <- gencodeInformation[gencodeInformation$gene_type %in% c("lncRNA", "protein_coding","snRNA")]
 
-chr_df <- data.frame(table(seqnames(gencodeInformation))) %>% filter(Var1 != "chrM")
+chr_df <- data.frame(table(seqnames(gencodeInformation))) %>% filter(Var1 != "chrM") # Remove mitochondrial
 
-### chr/mbp graph 
+### Graph to compare % CEs on each chromosome and % genes on each chromosome
 df_chr <- data.frame(table(df$chr)) %>% left_join(chr_df, by = "Var1") %>%
   mutate(pct_cryptic = signif(100*Freq.x/432,2),
          pct_gene = signif(100*Freq.y/sum(chr_df$Freq),2),
