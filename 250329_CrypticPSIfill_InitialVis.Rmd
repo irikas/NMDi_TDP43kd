@@ -447,11 +447,11 @@ gencodeInformation <- gencodeInformation[gencodeInformation$gene_type %in% c("ln
 chr_df <- data.frame(table(seqnames(gencodeInformation))) %>% filter(Var1 != "chrM") # Remove mitochondrial
 
 ### Graph to compare % CEs on each chromosome and % genes on each chromosome
-df_chr <- data.frame(table(df$chr)) %>% left_join(chr_df, by = "Var1") %>%
+df_chr <- data.frame(table(df$chr)) %>% full_join(chr_df, by = "Var1") %>%
   mutate(pct_cryptic = signif(100*Freq.x/432,2),
          pct_gene = signif(100*Freq.y/sum(chr_df$Freq),2),
-         Var1 = factor(Var1, paste0("chr",c(1:22,"X"))))%>%
-  arrange(Var1, levels=paste0("chr",c(1:22,"X")))
+         Var1 = factor(Var1, paste0("chr",c(1:22,"X","Y"))))%>%
+  arrange(Var1, levels=paste0("chr",c(1:22,"X","Y")))
 
 df_chr %>% 
   ggplot(aes(x=Var1)) +
@@ -466,7 +466,7 @@ df_chr %>%
         axis.title = element_text(size = 20, family = "Helvetica", color = "black"),
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-   geom_segment(aes(x = seq(0.5,23,1), xend = seq(1.5,23.5,1), 
+   geom_segment(aes(x = seq(0.5,24,1), xend = seq(1.5,24.5,1), 
                     y = pct_gene),
                  color="black", linewidth = 4)
 
