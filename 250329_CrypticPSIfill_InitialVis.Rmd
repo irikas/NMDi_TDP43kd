@@ -477,41 +477,36 @@ df_chr %>%
 
 
 ## Identify high expressors (cryptic targets)
+High expressor cryptic exons have a PSI of at least 70% in at least one condition but the maximum control PSI is 10% in any condition.
 
-```{r HighExp}
-
-nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
-
+```{r VisHigh}
 ## High expressors
-df_high <- df %>% filter(maxTDP > 70 &  maxCtrl < 10) 
-
+df_high <- df %>% filter(maxPSI_sgTARDBP > 70 &  maxPSI_Ctrl < 10) 
 # write.csv(df_high,"output_tables/251224_CrypticCoordinates_HighExp.csv")
 
-pieChartFx(df_high$type, cols = c("#002D72","#69140E","#F2F3AE","#587B7F","#82735C"))
+# There are no skiptics.  - Fig S2B
+pieChartFx((df_high %>% mutate(type = factor(type,c("cassette", "start site", "exon ext.", "polyA"))) %>% 
+              arrange(type))$type, 
+           cols = c("#002D72","#82735C","#69140E", "#F2F3AE"))
 table(df_high$type)
 
-
-### Plots to look at dPSI as a result of NMDi 
-### Comparison to TDP-43 KD only
-cryptic_df_dNMD <- cryptic_df_high[,c(1:18,42:54)] %>% 
-  pivot_longer(20:30, names_to = "condition", names_prefix = "avg", values_to = "PSI")
-cryptic_df_dNMD_avgT <- cryptic_df_dNMD %>% filter(condition == "T")
-cryptic_df_dNMD_avgNMD <- cryptic_df_dNMD %>% filter(condition != "T") %>% 
-  mutate(facetCol = condition)
-cond <- unique(cryptic_df_dNMD$condition)
-
-for(i in cond){
-  cryptic_df_dNMD_avgNMD <- rbind(cryptic_df_dNMD_avgNMD, 
-                                  cryptic_df_dNMD_avgT %>% mutate(facetCol = i))
-  rm(i)
-}
-
-cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
-  mutate(condition = factor(condition, levels=c("T","TXS","TX","TUS","TXU"))) %>%
+# Fig S2D: High expressor PSI in all conditions
+df_high %>% 
+  pivot_longer(starts_with("avgPSI"), 
+               names_to = "condition", 
+               names_prefix = "avgPSI_", 
+               values_to = "PSI") %>%
+  filter(str_detect(condition, "^sgTARDBP")) %>%
+  mutate(condition = factor(condition, 
+                           levels=c("sgTARDBP",
+                                    "sgTARDBP_shXRN1",
+                                    "sgTARDBP_shXRN1/shSMG6",
+                                    "sgTARDBP_shUPF1/shSMG6",
+                                    "sgTARDBP_shXRN1/shUPF1"))) %>%
   ggplot(aes(x = condition, y = PSI)) +
-  #geom_line(aes(group=`ID #`), alpha = 0.3,linewidth=0.5) +
-  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
-               outlier.color = "#444444",outlier.size = 1) +
+  geom_point(alpha = 0.5, position = position_jitter(width = 0.2), size=3, color =  "#444444")+
+  geom_boxplot(alpha=0.8, outliers = F, fill = "#444444", color = "black",
+               outlier.color = "#444444",outlier.size = 1, linewidth=2) +
   scale_color_viridis_d(option = "viridis")+
   theme_classic()+ xlab("") + ylab("Average R/L PSI") +
   theme(text = element_text(size = 25, family = "Helvetica"), legend.position = "none",
@@ -521,8 +516,19 @@ cryptic_df_dNMD_avgNMD %>% filter(facetCol %in% c("TXS","TX","TUS","TXU")) %>%
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
-    stat_compare_means(label = "p.signif", method = "wilcox.test", ref.group = "T")
+  stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP")+
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25)))
+
+
+```
+
+## What do the gene expression patterns look like for these cryptic exons?
+Using NAUC as a metric of gene expresion as calculated by ASCOT.
+
+```{r HighExp}
+
+nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
+
 
 ## HEAT MAPS
 
