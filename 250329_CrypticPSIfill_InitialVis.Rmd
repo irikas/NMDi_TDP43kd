@@ -36,7 +36,7 @@ for(i in CRANpackages){
 .sj files generated from STAR alignment of reads and include splice junction information for each sample.
 Create a new dataframe with splice junction counts from each sample for relevant junctions
 
-```{r mergeSJ, eval=FALSE}
+```{r mergeSJ, eval=FALSE, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ### Load cryptic files
 cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2)[,1:19]
 skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3)[,1:6]
@@ -112,7 +112,7 @@ finaldf <- finaldf %>% filter(Condition != "FALSE") %>%
 Separately calculate PSIs for cryptic and skiptic exons using the values from the previous chunk. Save the values then update Table 1 and 2.
 
 
-```{r calcPSI, eval=FALSE}
+```{r calcPSI, eval=FALSE, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 junctionCountdf <- fread("output_tables/251224_SpliceJunctions_Cleaned.csv")
 
 ## Create new dataframe to populate with splice junction counts: cryptic exons
@@ -223,7 +223,7 @@ skiptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 423:432))
 ## Create Summary columns
 Find rowwise means/avgs per condition, etc.
 
-```{r SummaryColumns}
+```{r SummaryColumns, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## Create one table with only gene symbol, ensembl id, ce id, and PSIs
 cryptic_df_fill_subset <- fread("output_tables/251224_CrypticCoordinates.csv") %>% 
   dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
@@ -286,7 +286,7 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 
 # Visualize proportions of different types of cryptic and skiptic exons
 
-```{r VisPieChart}
+```{r VisPieChart, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ### Load cryptic files
 cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% mutate(chr = str_split_i(canonical_splice_junction,":",1))
 skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% mutate(type = "skiptic") %>% mutate(chr = str_split_i(skiptic_junction,":",1))
@@ -314,7 +314,7 @@ table(df$Inframe)
 
 # Visualize the difference in CE inclusion rates with NMDi
 
-```{r NMDplots}
+```{r NMDplots, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 # Create a df with CEs labeled as per cut-off for TDP-43kd only PSIs
 df_NMD <- df %>% mutate(NMDonly10pct = ifelse(avgPSI_sgTARDBP <= 10, "10pct", "TDPKDonly"),
                         NMDonly5pct = ifelse(avgPSI_sgTARDBP <= 5, "5pct", "TDPKDonly"),
@@ -459,7 +459,7 @@ df_NMD %>% filter(condition != "sgCtrl", condition != "sgTARDBP",
 Figure S1D: Cryptic exons/chr --> normalize to number of genes in the chr
 Use information from GTF file for Release 49 (GRCh38.p14) --> Basic gene annotation
 
-```{r chrGenes}
+```{r chrGenes, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6, cache=T}
 ## Load GTF file --> genes only
 gencodeInformation <- rtracklayer::import("data/gencode.v49.basic.annotation.gtf")
 gencodeInformation <- gencodeInformation[gencodeInformation$type == "gene"]
@@ -503,7 +503,7 @@ df_chr %>%
 ## Identify high expressors (cryptic targets)
 High expressor cryptic exons have a PSI of at least 70% in at least one condition but the maximum control PSI is 10% in any condition.
 
-```{r VisHigh}
+```{r VisHigh, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## High expressors
 df_high <- df %>% filter(maxPSI_sgTARDBP > 70 &  maxPSI_Ctrl < 10) 
 # write.csv(df_high,"output_tables/251224_CrypticCoordinates_HighExp.csv")
@@ -550,7 +550,7 @@ df_high %>%
 Using NAUC as a metric of gene expresion as calculated by ASCOT.
 
 First look at high-expressors.
-```{r GeneExpNAUC}
+```{r GeneExpNAUC, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 nauc <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
 
 ## HEAT MAPS
@@ -600,7 +600,7 @@ maxPSI <- df_high[maxCE,]
 
 # Still two duplicates due to same max - rmove the ones at a lower PSI after TDP kd only
 maxPSI <- maxPSI %>% filter(!(cryptic_exon_id %in% c("CE140","CE359"))) 
-maxPSI <- maxPSI[,c(1,4:14)]
+maxPSI <- maxPSI[,c(1,7:17)]
 colnames(maxPSI)[1] = "gene"
 
 # MERGE WITH ORDERED DF
@@ -608,18 +608,18 @@ maxPSI$gene[13] = "CTB-50L17.10"
 maxPSI$gene[10] = "C20orf194"
 
 crypticHighOrder <- left_join(crypticHighOrder, maxPSI, by = "gene") %>% 
-  column_to_rownames("gene")
-crypticHighOrder[is.na(crypticHighOrder)] = 0
+  column_to_rownames("gene") 
 
-pheatmap(t(as.matrix(crypticHighOrder[,-6])), 
-         color = viridis(length(seq(0,100,1)),option="F"),
+breaksList = seq(0, 100, by = 1)
+pheatmap((t(as.matrix(crypticHighOrder[,-6]))), 
+         color = viridis(length(breaksList),option="F"),
          border_color = NA, 
          cluster_rows = F,
          cluster_cols = F,
          show_rownames = F,
          treeheight_row = 0, 
          treeheight_col = 0,
-         breaks = seq(0,100,1)
+         breaks = breaksList
          )
 
 
@@ -627,7 +627,7 @@ pheatmap(t(as.matrix(crypticHighOrder[,-6])),
 
 NMDi-revealed CEs expression and PSI
 
-```{r NMDiCE}
+```{r NMDiCE, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## Subset to CEs with PSI <= 1% after TDP-43 KD only
 # all ctrl conditions < 10%
 df_NMDce <- df %>% mutate(NMDonly = ifelse(avgPSI_sgTARDBP <= 1, ifelse(maxPSI_Ctrl < 10, "Y", "N"), "N"))
