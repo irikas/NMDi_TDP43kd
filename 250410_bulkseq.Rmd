@@ -20,7 +20,7 @@ The purpose of this script is to take the file with manually identified cryptic 
 library("BiocManager")
 packages <- c("tidyverse", "ggplot2", "ggpubr", "ggstats","BiocManager",
               "viridis","gghighlight", "ggrepel","apeglm", "DESeq2", "knitr",
-              "biomaRt", "readxl")
+              "biomaRt", "readxl", "data.table")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -93,25 +93,30 @@ res <- lfcShrink(dds, coef="tdp_KD_vs_WT", type="apeglm")
 Next, use PSI values to raw counts for CE-related downregulation.
 functional transcript = counts * (1-PSI)
 
-```{r DESeq2_adj, eval = F}
-cryptic_df = read_delim("data/250601_CE_table.csv")
+```{r DESeq2_adj, eval = T, cache=T}
+cryptic_df <- fread("output_tables/251225_cetable_psi.csv")
 adj_count <- readRDS("data/dds_counts_org.RDS")
+
+# Original DDS
+dds <- readRDS("data/nmdi_all_annotated_deseq2.dds.RDS")
+dds <- dds[,11:14]
+dds <- dds[rowSums(counts(dds)) >= 10,] # at least 10 total reads across all samples
 
 ## Create new CE df which accounts for multiple CEs for a single gene
 # Choose higher avgPSI for a gene with multiple CEs
-cryptic_df_PSImax <- cryptic_df[,-c(7:17)] %>% 
-  group_by(`Gene Symbol`, `Ensembl ID`) %>% 
+cryptic_df_PSImax <- cryptic_df %>% 
+  group_by(gene_symbol, ensembl_id) %>% 
   summarize(avgT = max(avgPSI_sgTARDBP)) %>% # For gene with multiple CEs, choose higher PSI
   mutate(avgT = ifelse(!is.na(avgT),avgT, 0)) %>% # If there are no counts for this gene, the PSI is 0
-  left_join(cryptic_df %>% dplyr::select(`Gene Symbol`,type,avgPSI_sgTARDBP,maxPSI_sgTARDBP), 
-            by = join_by(`Gene Symbol`==`Gene Symbol`,avgT==avgPSI_sgTARDBP)) %>%
+  left_join(cryptic_df %>% dplyr::select(gene_symbol,type,avgPSI_sgTARDBP,maxPSI_sgTARDBP), 
+            by = join_by(gene_symbol==gene_symbol,avgT==avgPSI_sgTARDBP)) %>%
   ungroup() %>%
   mutate(pct_transcript = 1-avgT/100, type = tolower(type)) %>%
   distinct()
 
 # For each gene with a cryptic exon, adjust the TDPKD value to reflect effective down-regulation of the gene due to CE inclusion
 for(i in 1:nrow(cryptic_df_PSImax)){
-  n = which(rownames(adj_count) == cryptic_df_PSImax$`Ensembl ID`[i]) # Identify row in counts for CE
+  n = which(rownames(adj_count) == cryptic_df_PSImax$ensembl_id[i]) # Identify row in counts for CE
   pct_transcript = cryptic_df_PSImax$pct_transcript[i] 
   
   # Adjust counts
@@ -130,22 +135,23 @@ dds_adj <- DESeqDataSetFromMatrix(countData = as.matrix(adj_count),
 dds_adj <- DESeq(dds_adj)
 res_adj <- lfcShrink(dds_adj, coef="tdp_KD_vs_WT", type="apeglm")
 
-# saveRDS(res_adj, "data/dds_res_adj.RDS")
+# saveRDS(res_adj, "data/251225_dds_res_adj.RDS")
 
 ```
 
 ## Create results dataframes for plotting
 
-```{r DESeq2_df, eval=F}
+```{r DESeq2_df, eval=T,cache=T}
 
 res_org <- readRDS("data/dds_res_org.RDS")
-res_adj <- readRDS("data/dds_res_adj.RDS")
+res_adj <- readRDS("data/251225_dds_res_adj.RDS")
 
 ## Create a df with all results
 res_df <- data.frame(res_org) %>% rownames_to_column("ensg") %>%
   mutate(logp_org = -log10(padj)) %>%
   dplyr::select(ensg,log2FoldChange,logp_org) %>% 
   dplyr::rename(lfc_org = log2FoldChange)
+
 res_adj_df <- data.frame(res_adj) %>% rownames_to_column("ensg") %>% 
   mutate(logp_adj = -log10(padj)) %>%
   dplyr::select(ensg,log2FoldChange,logp_adj) %>% 
@@ -167,7 +173,7 @@ res_df <- left_join(info, res_df, by = join_by("ensembl_gene_id" == "ensg"))
 res_df <- res_df %>% mutate(ce_type = NA, tdpkd_psi = NA, tdpkd_nmdi_psi = NA)
 
 for(i in 1:nrow(cryptic_df_PSImax)){
-  n = which(res_df$ensembl_gene_id == cryptic_df_PSImax$`Ensembl ID`[i])
+  n = which(res_df$ensembl_gene_id == cryptic_df_PSImax$ensembl_id[i])
   res_df$ce_type[n] = cryptic_df_PSImax$type[i]
   res_df$tdpkd_psi[n] = cryptic_df_PSImax$avgT[i]
   res_df$tdpkd_nmdi_psi[n] = cryptic_df_PSImax$maxPSI_sgTARDBP[i]
@@ -175,7 +181,9 @@ for(i in 1:nrow(cryptic_df_PSImax)){
   rm(i,n)
 }
 
-# saveRDS(res_df, "output_tables/251216_NMDi_bulkseq_res.RDS")
+res_df <- res_df %>% mutate(ce_type = factor(ce_type, c("cassette", "exon ext.", "polya",  "start site", "skiptic")))
+
+# saveRDS(res_df, "output_tables/251225_NMDi_bulkseq_res.RDS")
 
 ```
 
@@ -183,19 +191,21 @@ for(i in 1:nrow(cryptic_df_PSImax)){
 
 This is the unadjusted volcano plot for gene expression
 ```{r plot_org, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
+
+# Fig 4D
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo")
 
 # Plot log2FC vs -log10Padj with CEs with abs(lfc) > 1 and p.adj < 10^-20 named on plot
 res_df %>% mutate(logp_org = ifelse(is.infinite(logp_org) | logp_org > 50, 50, logp_org), # Set max limit for -log10P
                   lfc_org = ifelse(lfc_org < -5,-5, ifelse(lfc_org > 5, 5, lfc_org)), # Set limits for log2FC
                   gene_label = ifelse(logp_org>20 & abs(lfc_org) > 1,external_gene_name,"")) %>% # ID labeled CEs
-  ggplot(aes(x=lfc_org,y=logp_org, color=factor(ce_type)))+ 
+  ggplot(aes(x=lfc_org,y=logp_org, color=ce_type))+ 
   geom_point(alpha=0.8,size=3) + theme_classic() + 
   gghighlight(!is.na(ce_type),unhighlighted_params = list(alpha=0.5, size=2))+ # Color points by CE type
   geom_label_repel(aes(label = gene_label), 
                    box.padding = 0.5, max.overlaps = Inf, fontface = "bold",
                    fill = alpha(c("white"),0.5), label.size = NA)+
-  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C", "#587B7F"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60) + ylab("-log10P") + xlab("log2FC")
 
@@ -204,7 +214,7 @@ res_df %>% mutate(logp_org = ifelse(is.infinite(logp_org) | logp_org > 50, 50, l
 Adjust the gene expression for CE-induced downregulation.
 
 ```{r plot_adj, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
-
+# Fig 4E
 # Plot log2FC vs -log10Padj with CEs with abs(lfc) > 1 and p.adj < 10^-20 named on plot
 res_df %>% mutate(logp_adj = ifelse(is.infinite(logp_adj) | logp_adj > 50, 50, logp_adj), # Set max limit for -log10P
                   lfc_adj = ifelse(lfc_adj < -5,-5, ifelse(lfc_adj > 5, 5, lfc_adj)), # Set limits for log2FC
@@ -215,7 +225,7 @@ res_df %>% mutate(logp_adj = ifelse(is.infinite(logp_adj) | logp_adj > 50, 50, l
   geom_label_repel(aes(label = gene_label), 
                    box.padding = 0.5, max.overlaps = Inf, fontface = "bold",
                    fill = alpha(c("white"),0.5), label.size = NA)+
-  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C"))+
+  scale_color_manual(values=c("#002D72","#69140E","#ffc000","#82735C", "#587B7F"))+
   theme(text = element_text(family="Helvetica"))+
   ylim(0,60) + ylab("-log10P") + xlab("log2FC")
 ```
@@ -223,7 +233,7 @@ res_df %>% mutate(logp_adj = ifelse(is.infinite(logp_adj) | logp_adj > 50, 50, l
 Plot impact of PSI adjustment
 
 ```{r plot_log2FCdiff, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
-
+## Fig S4A
 # Graph CE-adjusted log2FC and unadjusted log2FC
 res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
   mutate(lfc_org = ifelse(lfc_org < -2,-2, ifelse(lfc_org > 2, 2, lfc_org)), # Set limits for log2FC
@@ -244,6 +254,7 @@ res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
 ## NMD sensitivity of CE vs l2fc
 
 ```{r plot_NMD, fig.align = "center", out.width="75%", fig.dpi=300, fig.asp=1}
+## Fig S4B
 ## Look at NMD sensitive CEs
 
 res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
@@ -252,7 +263,8 @@ res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
          tdpkd_nmdi_psi = ifelse(is.na(tdpkd_nmdi_psi), 0, tdpkd_nmdi_psi),
          l2psi = log2((tdpkd_nmdi_psi+0.01)/(tdpkd_psi+0.01)),
          gene_label = ifelse(tdpkd_psi > 50,external_gene_name,""),
-         gene_NMD = ifelse(tdpkd_psi < 10, ifelse(tdpkd_psi < 5, "5pct", "10pct"), "TDP-43 KD only")) %>% # Label points for genes with PSI >= 50% 
+         gene_NMD = ifelse(tdpkd_psi < 10, 
+                           ifelse(tdpkd_psi < 5, "5pct", "10pct"), "TDP-43 KD only")) %>% # Label points for genes with PSI >= 50% 
   ggplot(aes(x=lfc_adj,y=l2psi))+ 
   geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + theme_classic() + 
   gghighlight(gene_NMD != "TDP-43 KD only",unhighlighted_params = list(alpha=0.8, size=5, shape = 16))+
@@ -262,6 +274,7 @@ res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs
   xlim(-5,2.5)+ylim(0,6)+
   labs(x = "log2FC (psi-adj)", y = "log2PSI (nmdi/tdponly)", 
        title = "Increased nmdi of ce moderately correlated with decreased l2fc")
+
 
 # Graph CE-adjusted log2FC and unadjusted log2FC
 res_df %>% filter(!is.na(ce_type)) %>% # Only plot genes with CEs

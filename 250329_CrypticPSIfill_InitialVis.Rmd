@@ -225,20 +225,20 @@ Find rowwise means/avgs per condition, etc.
 
 ```{r SummaryColumns, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## Create one table with only gene symbol, ensembl id, ce id, and PSIs
-cryptic_df_fill_subset <- fread("output_tables/251224_CrypticCoordinates.csv") %>% 
-  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
-skiptic_df_fill_subset <- fread("output_tables/251224_SkipticCoordinates.csv") %>%
-  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
+cryptic_df_fill_subset <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>%  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,type,starts_with("avgPSI_")))
 
-df <- rbind(cryptic_df_fill_subset,skiptic_df_fill_subset)
+skiptic_df_subset <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_"))) %>% 
+  mutate(type="skiptic") %>% relocate(type, .after=cryptic_exon_id)
+
+df <- rbind(cryptic_df_fill_subset,skiptic_df_subset)
 df[is.na(df)] = 0
 
 # Add max
-df$maxPSI_Ctrl = apply(df %>% dplyr::select(contains("avgPSI_C")),1,function(x) max(x, na.rm=T))
-df$maxPSI_sgTARDBP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
+df$maxPSI_Ctrl = apply(df %>% dplyr::select(!contains("avgPSI_sgTARDBP") & contains("avgPSI") ),1,function(x) max(x, na.rm=T))
+df$maxPSI_sgTARDBP = apply(df %>% dplyr::select(contains("avgPSI_sgTARDBP")),1,function(x) max(x, na.rm=T))
 df$maxPSI_Diff = df$maxPSI_sgTARDBP-df$maxPSI_Ctrl
 
-# write.csv(df,"output_tables/251224_cetable_psi.csv", row.names = F)
+# write.csv(df,"output_tables/251225_cetable_psi.csv", row.names = F)
 ```
 
 ## Basic Visualizations of cryptic exons
