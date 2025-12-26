@@ -225,9 +225,9 @@ Find rowwise means/avgs per condition, etc.
 
 ```{r SummaryColumns}
 ## Create one table with only gene symbol, ensembl id, ce id, and PSIs
-cryptic_df_fill_subset <- cryptic_df_fill %>% 
+cryptic_df_fill_subset <- fread("output_tables/251224_CrypticCoordinates.csv") %>% 
   dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
-skiptic_df_fill_subset <- skiptic_df_fill %>%
+skiptic_df_fill_subset <- fread("output_tables/251224_SkipticCoordinates.csv") %>%
   dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_")))
 
 df <- rbind(cryptic_df_fill_subset,skiptic_df_fill_subset)
@@ -235,8 +235,8 @@ df[is.na(df)] = 0
 
 # Add max
 df$maxPSI_Ctrl = apply(df %>% dplyr::select(contains("avgPSI_C")),1,function(x) max(x, na.rm=T))
-df$maxPSI_TDP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
-df$maxPSI_Diff = df$maxPSI_TDP-df$maxPSI_Ctrl
+df$maxPSI_sgTARDBP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
+df$maxPSI_Diff = df$maxPSI_sgTARDBP-df$maxPSI_Ctrl
 
 # write.csv(df,"output_tables/251224_cetable_psi.csv", row.names = F)
 ```
@@ -525,17 +525,15 @@ df_high %>%
 ## What do the gene expression patterns look like for these cryptic exons?
 Using NAUC as a metric of gene expresion as calculated by ASCOT.
 
-```{r HighExp}
-
-nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
-
+First look at high-expressors.
+```{r GeneExpNAUC}
+nauc <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
 
 ## HEAT MAPS
-
 # High expressor gene expression across tissues
-cryptic_df_high <- cryptic_df %>% filter(maxTDP > 70, maxCtrl < 10) 
+df_high <- df %>% filter(maxPSI_sgTARDBP > 70 &  maxPSI_Ctrl < 10) 
 
-nauc_highCE <- nauc %>% filter(gene_id %in% cryptic_df_high$`Ensembl ID`) %>% 
+nauc_highCE <- nauc %>% filter(gene_id %in% df_high$ensembl_id) %>% 
   pivot_longer(3:58, names_to = "tissue", values_to = "nauc") %>%
   mutate(nauc = ifelse(nauc >=10, 10, nauc))
 
@@ -545,7 +543,7 @@ pheatmap(t(as.matrix(nauc_highCE_mat)),
          color = viridis(length(seq(0,10,0.1)),option="D"),
          border_color = NA, 
          cluster_rows = F,
-         show_rownames = F,
+         show_rownames = T,
          treeheight_row = 0, 
          treeheight_col = 0,
          breaks = seq(0,10,0.1)
@@ -553,7 +551,6 @@ pheatmap(t(as.matrix(nauc_highCE_mat)),
 
 # Create matching PSI graph
  
-
 orderGenes <- pheatmap(t(as.matrix(nauc_highCE_mat)), 
          color = viridis(length(seq(0,10,0.1)),option="D"),
          border_color = NA, 
@@ -566,31 +563,31 @@ orderGenes <- pheatmap(t(as.matrix(nauc_highCE_mat)),
 crypticHighOrder <- data.frame(gene = orderGenes$tree_col$labels[orderGenes$tree_col$order])
 
 # Choose highest PSI CE for a gene with multiple in high expressors
-maxPSI <- cryptic_df_high %>% filter(`Ensembl ID` %in% nauc_highCE$gene_id) %>%
-  group_by(`Gene Symbol`) %>%
-  summarize(max = max(maxTDP)) 
+maxPSI <- df_high %>% filter(ensembl_id %in% nauc_highCE$gene_id) %>%
+  group_by(gene_symbol) %>%
+  summarize(max = max(maxPSI_sgTARDBP)) 
 
 maxCE <- c()
 for(i in 1:nrow(maxPSI)){
-  maxCE <- append(maxCE, which(cryptic_df_high$`Gene Symbol`== maxPSI$`Gene Symbol`[i] & cryptic_df_high$maxTDP== maxPSI$max[i]))
+  maxCE <- append(maxCE, which(df_high$gene_symbol == maxPSI$gene_symbol[i] & df_high$maxPSI_sgTARDBP== maxPSI$max[i]))
 }
 
-maxPSI <- cryptic_df_high[maxCE,c(1:4,42:54)]
+maxPSI <- df_high[maxCE,]
 
 # Still two duplicates due to same max - rmove the ones at a lower PSI after TDP kd only
-maxPSI <- maxPSI %>% filter(!(`ID #` %in% c("CE140","CE360"))) 
-maxPSI <- maxPSI[,c(1,5,8,7,6,9,10,13,12,11,14)]
+maxPSI <- maxPSI %>% filter(!(cryptic_exon_id %in% c("CE140","CE359"))) 
+maxPSI <- maxPSI[,c(1,4:14)]
 colnames(maxPSI)[1] = "gene"
 
 # MERGE WITH ORDERED DF
-maxPSI$gene[15] = "CTB-50L17.10"
-maxPSI$gene[12] = "C20orf194"
+maxPSI$gene[13] = "CTB-50L17.10"
+maxPSI$gene[10] = "C20orf194"
 
 crypticHighOrder <- left_join(crypticHighOrder, maxPSI, by = "gene") %>% 
   column_to_rownames("gene")
 crypticHighOrder[is.na(crypticHighOrder)] = 0
 
-pheatmap(t(as.matrix(crypticHighOrder)), 
+pheatmap(t(as.matrix(crypticHighOrder[,-6])), 
          color = viridis(length(seq(0,100,1)),option="F"),
          border_color = NA, 
          cluster_rows = F,
@@ -604,27 +601,24 @@ pheatmap(t(as.matrix(crypticHighOrder)),
 
 ```
 
-## NMDi-revealed CEs expression and PSI
-```{r NMDiCE}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
-cryptic_df = read_delim("data/250601_CE_table.csv")
-nauc <- read_delim("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/gtex_nauc.csv")
+NMDi-revealed CEs expression and PSI
 
+```{r NMDiCE}
 ## Subset to CEs with PSI <= 1% after TDP-43 KD only
-# all ctrl conditions < 5%
-cryptic_df <- cryptic_df %>% mutate(NMDonly = ifelse(avgT <= 1, ifelse(maxCtrl < 10, "Y", "N"), "N"))
-nmdOnlyCEs <- cryptic_df[which(cryptic_df$NMDonly == "Y"),]
+# all ctrl conditions < 10%
+df_NMDce <- df %>% mutate(NMDonly = ifelse(avgPSI_sgTARDBP <= 1, ifelse(maxPSI_Ctrl < 10, "Y", "N"), "N"))
+nmdOnlyCEs <- df[which(df_NMDce$NMDonly == "Y"),]
 
 ## Table Information
-nmdOnlyCEs_df <- cryptic_df %>% 
-  mutate(NMDonly = ifelse(avgT <= 10, ifelse(maxCtrl < 10, "10pct", "N"), "N"),
-         NMDonly = ifelse(avgT <= 5, ifelse(maxCtrl < 10, "5pct", NMDonly), NMDonly),
-         NMDonly = ifelse(avgT <= 1, ifelse(maxCtrl < 10, "1pct", NMDonly), NMDonly)) %>%
+nmdOnlyCEs_df <- df_NMDce %>% 
+  mutate(NMDonly = ifelse(avgPSI_sgTARDBP <= 10, ifelse(maxPSI_Ctrl < 10, "10pct", "N"), "N"),
+         NMDonly = ifelse(avgPSI_sgTARDBP <= 5, ifelse(maxPSI_Ctrl < 10, "5pct", NMDonly), NMDonly),
+         NMDonly = ifelse(avgPSI_sgTARDBP <= 1, ifelse(maxPSI_Ctrl < 10, "1pct", NMDonly), NMDonly)) %>%
   filter(NMDonly != "N")
 
-# write.csv(nmdOnlyCEs_df[,c(1:7,9,42:55)],"output_tables/251215_NMD_CrypticCoordinates.csv", row.names = F)
+# write.csv(nmdOnlyCEs_df,"output_tables/251224_NMD_CrypticCoordinates.csv", row.names = F)
 
-nauc_NMD <- nauc %>% filter(gene_id %in% nmdOnlyCEs$`Ensembl ID`) %>%
+nauc_NMD <- nauc %>% filter(gene_id %in% nmdOnlyCEs$ensembl_id) %>%
   dplyr::select(-gene_id) %>% 
   pivot_longer(2:57,names_to = "tissue", values_to = "nauc") %>%
   mutate(nauc = ifelse(nauc > 10, 10, nauc)) %>%
@@ -644,23 +638,28 @@ pheatmap(t(as.matrix(nauc_NMD)),
          treeheight_col = 0)
 
 # PSI
-cryptic_df_plot <- cryptic_df %>% 
-  filter(`Gene Symbol` %in% c("CYFIP2", "NRXN2", "GAK", "NADSYN1", "ENAH", "PBX1")) %>%
-  dplyr::select(c(`Gene Symbol`, `ID #`,starts_with("avg"))) %>%
-  filter(!(`ID #` %in% c("CE092", "CE093","CE267"))) %>% # MANUAL SELECTION OF STRONGEST CE 
-  dplyr::select(-`ID #`) %>%
-  pivot_longer(2:11, names_to = "cond", values_to = "psi") %>%
+df_PSI <- df_NMDce %>% 
+  filter(gene_symbol %in% c("CYFIP2", "NRXN2", "MTMR3", "NADSYN1", "ENAH", "PBX1")) %>%
+  dplyr::select(c(gene_symbol, cryptic_exon_id,starts_with("avg"))) %>%
+  filter(!(cryptic_exon_id %in% c("CE092", "CE093","CE266"))) %>% # MANUAL SELECTION OF STRONGEST CE 
+  dplyr::select(-cryptic_exon_id) %>%
+  arrange(gene_symbol, levels = c("CYFIP2", "NRXN2", "MTMR3", "NADSYN1", "ENAH", "PBX1")) %>%
+  pivot_longer(starts_with("avgPSI_"), names_to = "cond", values_to = "psi") %>%
+  filter(cond != "avgPSI_sgCtrl") %>%
+  mutate(cond = factor(cond, c("avgPSI_Ctrl",
+                               "avgPSI_shXRN1","avgPSI_shXRN1/shSMG6",
+                               "avgPSI_shUPF1/shSMG6","savgPSI_shXRN1/shUPF1",
+                               "avgPSI_sgTARDBP",
+                               "avgPSI_sgTARDBP_shXRN1", "avgPSI_sgTARDBP_shXRN1/shSMG6",
+                               "avgPSI_sgTARDBP_shUPF1/shSMG6", "avgPSI_sgTARDBP_shXRN1/shUPF1"))) %>%
   pivot_wider(names_from = cond, values_from = psi, names_sort = T) %>%
-  column_to_rownames("Gene Symbol")
-
-#Re-order
-cryptic_df_plot <- cryptic_df_plot[c(1,5,3,4,2,6),c(1, 4, 3, 2, 5, 6, 9, 8, 7, 10)]
+  column_to_rownames("gene_symbol")
 
 # Sets the minimum (0), the maximum (15), and the increasing steps (+1) for the color scale
 # Note: if some of your genes are outside of this range, they will appear white on the heatmap
 breaksList = seq(0, 30, by = 0.1)
 
-pheatmap(t(as.matrix(cryptic_df_plot)), 
+pheatmap(t(as.matrix(df_PSI)), 
          cluster_cols = F,
          cluster_rows = F,
          fontsize = 12,
