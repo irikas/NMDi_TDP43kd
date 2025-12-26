@@ -403,7 +403,7 @@ df_NMD_dNMD_avgNMD %>% filter(str_detect(facetCol, "^sgTARDBP")) %>%
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
   geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
-    stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP")
+    stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP",)
 
 # CE PSI in every condition - Fig S1E
 df_NMD %>% filter(condition != "sgCtrl",
@@ -411,7 +411,31 @@ df_NMD %>% filter(condition != "sgCtrl",
   mutate(condition = factor(condition, 
                            levels=c("Ctrl",
                                     "sgTARDBP",
+                                    "sgTARDBP_shXRN1/shSMG6",
                                     "sgTARDBP_shXRN1",
+                                    "sgTARDBP_shUPF1/shSMG6",
+                                    "sgTARDBP_shXRN1/shUPF1"))) %>%
+  ggplot(aes(x = condition, y = PSI)) +
+  geom_boxplot(alpha=1, outliers = T, fill = "#444444", color = "black",
+               outlier.color = "#444444",outlier.size = 1,linewidth = 2) +
+  theme_classic()+ xlab("") + ylab("Average R/L PSI") +
+  theme(text = element_text(size = 25, family = "Helvetica"), legend.position = "none",
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        axis.title = element_text(size = 20, family = "Helvetica", color = "black"),
+        plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
+        strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
+        strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
+    stat_compare_means(label = "p.signif", method = "t.test", ref.group="sgTARDBP_shUPF1/shSMG6",
+                       paired = T)
+
+
+# CE PSI in every condition - Fig S1F
+df_NMD %>% filter(condition != "sgCtrl", condition != "sgTARDBP",
+                  str_detect(condition, "sgTARDBP_")) %>%
+  mutate(condition = factor(condition, 
+                           levels=c("sgTARDBP_shXRN1",
                                     "sgTARDBP_shXRN1/shSMG6",
                                     "sgTARDBP_shUPF1/shSMG6",
                                     "sgTARDBP_shXRN1/shUPF1"))) %>%
@@ -427,8 +451,8 @@ df_NMD %>% filter(condition != "sgCtrl",
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
-    stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP")
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) #+
+    # stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP_shXRN1")
 
 ```
 
