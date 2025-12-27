@@ -1,0 +1,112 @@
+---
+title: "251226_CLIPseq"
+author: "Irika Sinha"
+date: "2025-12-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this file is to analyze the TDP-43 CLIP-seq peaks found in SH-SY5Y.
+
+## Packages
+
+```{r packages, warning=FALSE, message=FALSE,}
+#update.packages("BiocManager")
+library("BiocManager")
+packages <- c("tidyverse","data.table", "biomaRt")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  } else{
+    #BiocManager::install(pkgs = i, ask = F, update=T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+```
+
+## Load files
+CLIP-seq peaks from iCount
+
+```{r files}
+clip_df_nuclear <- fread("data/251104_ERR039853_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), type = "nuclear")
+clip_df_total1 <- fread("data/251104_ERR039854_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), type = "total1")
+clip_df_total2 <- fread("data/251104_ERR039855_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), type = "total2")
+
+clip_df <- rbind(clip_df_nuclear,clip_df_total1)
+clip_df <- rbind(clip_df,clip_df_total2)# %>% filter(FDR < 0.2)
+
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
+  mutate(chr = str_split_i(cryptic_exon_coordinates,":",1),
+         coordinates = str_split_i(cryptic_exon_coordinates,":",2),
+         start = str_split_i(coordinates, "-",1),
+         end = str_split_i(coordinates, "-",2)) %>%
+  dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id, chr, start, end)                                                                                                                                               
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% 
+  mutate(chr = str_split_i(skiptic_junction,":",1),
+         coordinates = str_split_i(skiptic_junction,":",2),
+         start = str_split_i(coordinates, "-",1),
+         end = str_split_i(coordinates, "-",2)) %>%
+  dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id, chr, start, end)
+
+df <- rbind(cryptic_df,skiptic_df) %>% 
+  mutate(start_600 = as.numeric(start) - 600,
+         end_600 = as.numeric(end) + 600)
+
+## Add strand to CEs
+## Add gene names
+mart <- useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+info <- getBM(attributes = c("ensembl_gene_id", "external_gene_name","strand", "gene_biotype"), 
+              filters = "ensembl_gene_id", values = df$ensembl_id, mart = mart)
+df <- left_join(df, info, by = join_by(ensembl_id == ensembl_gene_id)) %>% 
+  mutate(strand = ifelse(strand == -1, "-", "+"))
+
+
+```
+
+## Compare binding sites to cryptic exons
+```{r bindingSites}
+## Filter CLIP data to within binding site area of the CE
+clip_df <- clip_df %>% mutate(targets = "")
+clip_pos <- c()
+
+for(i in 1:nrow(clip_df)){
+  rows = which(df$chr == clip_df$chr[i] & df$end_600 > clip_df$position[i] & df$start_600 < clip_df$position[i] & df$strand == clip_df$strand[i])
+  
+  if(length(rows) != 0){
+    clip_df$targets[i] = unique(df$gene_symbol[rows])
+    rm(rows)
+  }
+  rm(i)
+}
+
+clip_cryptic <- clip_df %>% 
+  filter(targets!= "") %>%
+  group_by(name,targets) %>%
+  summarize(lowestFDR = min(FDR),
+            type = str_flatten_comma((unique(type))),
+            chr = unique(chr),
+            loc = str_flatten_comma(c(position)))
+
+## How many 
+# saveRDS(clip_cryptic,"output_tables/tollervey_shsy5y_clip.RDS")
+
+```
+
+
