@@ -1,0 +1,143 @@
+---
+title: "251226_CLIPseq"
+author: "Irika Sinha"
+date: "2025-12-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this file is to analyze the TDP-43 CLIP-seq peaks found in SH-SY5Y.
+
+## Packages
+
+```{r packages, warning=FALSE, message=FALSE,}
+#update.packages("BiocManager")
+library("BiocManager")
+packages <- c("tidyverse","data.table", "biomaRt")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F)
+  } else{
+    #BiocManager::install(pkgs = i, ask = F, update=T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+```
+
+## Load files
+CLIP-seq peaks from iCount
+
+```{r files}
+clip_df_nuclear <- fread("data/Tollervey_ERR039853_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), compartment = "nuclear", celltype = "SH-SY5Y",
+         exp = "Tollervey")
+clip_df_total1 <- fread("data/Tollervey_ERR039854_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+         exp = "Tollervey")
+clip_df_total2 <- fread("data/Tollervey_ERR039855_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+         exp = "Tollervey")
+clip_df_Tam1 <- fread("data/Tam_SRR8202226_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+         exp = "Tam")
+clip_df_Tam2 <- fread("data/Tam_SRR8202226_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+         exp = "Tam")
+
+list <- list(clip_df_nuclear, clip_df_total1, clip_df_total2, clip_df_Tam1, clip_df_Tam2)
+
+clipdata <- reduce(list, rbind)
+# saveRDS(clipdata, "data/251229_clipdata.RDS")
+clipdata <- readRDS("data/251229_clipdata.RDS")
+
+clipdata_filtered <- clipdata %>% filter(FDR < 0.05)
+
+rm(list=c(str_remove(ls(),"clipdata_filtered"))[-1]) # Clean environment
+
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
+  mutate(chr = str_split_i(cryptic_exon_coordinates,":",1),
+         coordinates = str_split_i(cryptic_exon_coordinates,":",2),
+         start = str_split_i(coordinates, "-",1),
+         end = str_split_i(coordinates, "-",2)) %>%
+  dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id, chr, start, end)                                                                                                                                               
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% 
+  mutate(chr = str_split_i(skiptic_junction,":",1),
+         coordinates = str_split_i(skiptic_junction,":",2),
+         start = str_split_i(coordinates, "-",1),
+         end = str_split_i(coordinates, "-",2)) %>%
+  dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id, chr, start, end)
+
+df <- rbind(cryptic_df,skiptic_df) %>% 
+  mutate(start_600 = as.numeric(start) - 600,
+         end_600 = as.numeric(end) + 600)
+
+## Add strand to CEs
+## Add gene names
+mart <- useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+info <- getBM(attributes = c("ensembl_gene_id", "external_gene_name","strand", "gene_biotype"), 
+              filters = "ensembl_gene_id", values = df$ensembl_id, mart = mart)
+df <- left_join(df, info, by = join_by(ensembl_id == ensembl_gene_id)) %>% 
+  mutate(strand = ifelse(strand == -1, "-", "+"))
+
+rm(cryptic_df,skiptic_df,info,mart)
+
+```
+
+## Compare binding sites to cryptic exons
+```{r bindingSites}
+
+clip_df <- data.frame()
+ce_name = c()
+
+# Filter to CLIP data to within binding site area of the CE
+for(i in paste0("chr",c(1:22,"X"))){
+  
+  df_temp <- clipdata_filtered %>% filter(chr == i)
+  ce_temp <- df %>% filter(chr == i)
+  
+  rows = c()
+  for(j in 1:nrow(ce_temp)){
+    n <- which(between(df_temp$position, ce_temp$start_600[j], ce_temp$end_600[j]) & 
+                 ifelse(ce_temp$strand[j] == "-", df_temp$strand == "+", df_temp$strand == "-"))
+    rows <- append(rows, n)
+    ce_name <- append(ce_name,rep(ce_temp$cryptic_exon_id[j], length(n)))
+    rm(n)
+  }
+  
+  clip_df <- rbind(clip_df, df_temp[rows,]) 
+  rm(i, df_temp,j)
+}
+
+clip_df$ce_id = ce_name
+
+clip_cryptic <- clip_df %>% 
+  mutate(id = paste0(celltype, ": ", compartment)) %>%
+  group_by(name) %>%
+  summarize(ce_id = str_flatten_comma((unique(ce_id))),
+            lowestFDR = min(FDR),
+            type = str_flatten_comma((unique(id))),
+            exp = str_flatten_comma((unique(exp))),
+            loc = str_flatten_comma(c(position)))
+
+## How many 
+length(unique(str_split_1(str_flatten_comma(clip_cryptic$ce_id), ", ")))
+
+# saveRDS(clip_cryptic,"output_tables/tollervey_tam_shsy5y_clip.RDS")
+
+```
+
+
