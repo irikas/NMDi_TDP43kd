@@ -18,7 +18,7 @@ The purpose of this file is to analyze the TDP-43 CLIP-seq peaks found in SH-SY5
 ```{r packages, warning=FALSE, message=FALSE,}
 #update.packages("BiocManager")
 library("BiocManager")
-packages <- c("tidyverse","data.table", "biomaRt")
+packages <- c("tidyverse","data.table", "biomaRt", "UpSetR")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -43,30 +43,49 @@ CLIP-seq peaks from iCount
 
 ```{r files}
 clip_df_nuclear <- fread("data/Tollervey_ERR039853_scores.tsv") %>%
-  mutate(chr = paste0("chr",chrom), compartment = "nuclear", celltype = "SH-SY5Y",
+  mutate(chr = paste0("chr",chrom), condition = "nuclear", celltype = "SH-SY5Y",
          exp = "Tollervey")
 clip_df_total1 <- fread("data/Tollervey_ERR039854_scores.tsv") %>%
-  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "SH-SY5Y",
          exp = "Tollervey")
 clip_df_total2 <- fread("data/Tollervey_ERR039855_scores.tsv") %>%
-  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "SH-SY5Y",
          exp = "Tollervey")
 clip_df_Tam1 <- fread("data/Tam_SRR8202226_scores.tsv") %>%
-  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "SH-SY5Y",
          exp = "Tam")
 clip_df_Tam2 <- fread("data/Tam_SRR8202226_scores.tsv") %>%
-  mutate(chr = paste0("chr",chrom), compartment = "total", celltype = "SH-SY5Y",
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "SH-SY5Y",
          exp = "Tam")
+clip_df_Rhine1 <- fread("data/Rhine_SRR30639403_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "Transdifferentiated cortical neurons",
+         exp = "Rhine")
+clip_df_Rhine2 <- fread("data/Rhine_SRR30639404_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "arsenite", celltype = "iPSC-derived cortical neurons",
+         exp = "Rhine")
+clip_df_Rhine3 <- fread("data/Rhine_SRR30639405_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "arsenite", celltype = "iPSC-derived cortical neurons",
+         exp = "Rhine")
+clip_df_Rhine4 <- fread("data/Rhine_SRR30639406_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "iPSC-derived cortical neurons",
+         exp = "Rhine")
+clip_df_Rhine5 <- fread("data/Rhine_SRR30639407_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "iPSC-derived cortical neurons",
+         exp = "Rhine")
+clip_df_Rhine5 <- fread("data/Rhine_SRR30639402_scores.tsv") %>%
+  mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "Transdifferentiated cortical neurons",
+         exp = "Rhine")
 
-list <- list(clip_df_nuclear, clip_df_total1, clip_df_total2, clip_df_Tam1, clip_df_Tam2)
+list <- list(clip_df_nuclear, clip_df_total1, clip_df_total2, clip_df_Tam1, clip_df_Tam2,
+             clip_df_Rhine1, clip_df_Rhine2, clip_df_Rhine3, clip_df_Rhine4, clip_df_Rhine5)
 
 clipdata <- reduce(list, rbind)
-# saveRDS(clipdata, "data/251229_clipdata.RDS")
-clipdata <- readRDS("data/251229_clipdata.RDS")
+# saveRDS(clipdata, "data/260103_clipdata.RDS")
+clipdata <- readRDS("data/260103_clipdata.RDS")
 
-clipdata_filtered <- clipdata %>% filter(FDR < 0.05)
+clipdata_filtered <- clipdata %>% filter(FDR < 0.05, condition != "arsenite")
 
-rm(list=c(str_remove(ls(),"clipdata_filtered"))[-1]) # Clean environment
+# rm(list=c(str_remove(ls(),"clipdata_filtered"))) # Clean environment
 
 cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
   mutate(chr = str_split_i(cryptic_exon_coordinates,":",1),
@@ -125,7 +144,7 @@ for(i in paste0("chr",c(1:22,"X"))){
 clip_df$ce_id = ce_name
 
 clip_cryptic <- clip_df %>% 
-  mutate(id = paste0(celltype, ": ", compartment)) %>%
+  mutate(id = paste0(celltype, ": ", condition)) %>%
   group_by(name) %>%
   summarize(ce_id = str_flatten_comma((unique(ce_id))),
             lowestFDR = min(FDR),
@@ -136,7 +155,17 @@ clip_cryptic <- clip_df %>%
 ## How many 
 length(unique(str_split_1(str_flatten_comma(clip_cryptic$ce_id), ", ")))
 
-# saveRDS(clip_cryptic,"output_tables/tollervey_tam_shsy5y_clip.RDS")
+## Upset plot
+clip_df <- clip_df %>% mutate(locID = paste0(name,"_",position))
+celltypes_clip <- unique(clip_df$celltype)
+
+lt <- list("iPSC-derived cortical neurons" = unique((clip_df %>% filter(celltype==celltypes_clip[1]))$name), 
+           "Transdiff cortical neurons"= unique((clip_df %>% filter(celltype==celltypes_clip[2]))$name),
+           "SH-SY5Y" = unique((clip_df %>% filter(celltype==celltypes_clip[3]))$name))
+upset(fromList(lt), order.by = "freq")
+
+
+# saveRDS(clip_cryptic,"output_tables/tollervey_tam__rhine_shsy5y_ipsc_clip.RDS")
 
 ```
 
