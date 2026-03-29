@@ -42,6 +42,7 @@ rm(versions)
 CLIP-seq peaks from iCount
 
 ```{r files}
+setwd('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub')
 clip_df_nuclear <- fread("data/Tollervey_ERR039853_scores.tsv") %>%
   mutate(chr = paste0("chr",chrom), condition = "nuclear", celltype = "SH-SY5Y",
          exp = "Tollervey")
@@ -76,14 +77,14 @@ clip_df_Rhine5 <- fread("data/Rhine_SRR30639402_scores.tsv") %>%
   mutate(chr = paste0("chr",chrom), condition = "wt", celltype = "Transdifferentiated cortical neurons",
          exp = "Rhine")
 
-list <- list(clip_df_nuclear, clip_df_total1, clip_df_total2, clip_df_Tam1, clip_df_Tam2,
+list_clip <- list(clip_df_nuclear, clip_df_total1, clip_df_total2, clip_df_Tam1, clip_df_Tam2,
              clip_df_Rhine1, clip_df_Rhine2, clip_df_Rhine3, clip_df_Rhine4, clip_df_Rhine5)
 
-clipdata <- reduce(list, rbind)
+clipdata <- reduce(list_clip, rbind)
 # saveRDS(clipdata, "data/260103_clipdata.RDS")
-clipdata <- readRDS("data/260103_clipdata.RDS")
+# clipdata <- readRDS("data/260103_clipdata.RDS")
 
-clipdata_filtered <- clipdata %>% filter(FDR < 0.05, condition != "arsenite")
+clipdata_filtered <- clipdata %>% filter(FDR < 0.2, condition != "arsenite")
 
 # rm(list=c(str_remove(ls(),"clipdata_filtered"))) # Clean environment
 
@@ -162,10 +163,18 @@ celltypes_clip <- unique(clip_df$celltype)
 lt <- list("iPSC-derived cortical neurons" = unique((clip_df %>% filter(celltype==celltypes_clip[1]))$name), 
            "Transdiff cortical neurons"= unique((clip_df %>% filter(celltype==celltypes_clip[2]))$name),
            "SH-SY5Y" = unique((clip_df %>% filter(celltype==celltypes_clip[3]))$name))
-upset(fromList(lt), order.by = "freq")
+upset(fromList(lt), order.by = "freq", mb.ratio = c(0.8,0.2))
 
 
-# saveRDS(clip_cryptic,"output_tables/tollervey_tam__rhine_shsy5y_ipsc_clip.RDS")
+# saveRDS(clip_cryptic,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/tollervey_tam_rhine_shsy5y_ipsc_clip.RDS")
+
+df_info <- data.frame("cell" = c(rep("iPSC", length(lt$`iPSC-derived cortical neurons`)),
+                                 rep("iPSC", length(lt$`Transdiff cortical neurons`)),
+                                 rep("iPSC", length(lt$`SH-SY5Y`))),
+                      "genes" = c(lt$`iPSC-derived cortical neurons`,
+                                  lt$`Transdiff cortical neurons`,
+                                  lt$`SH-SY5Y`))
+data.frame(table(df_info)) %>% arrange("Freq")
 
 ```
 
