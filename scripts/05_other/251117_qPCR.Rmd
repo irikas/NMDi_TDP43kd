@@ -33,6 +33,7 @@ rm(versions)
 ```
 
 ## Data QC
+<<<<<<< Updated upstream
 11/17/2025
 -KALRN #7-21 & #7-22 were not amplified (no primer added)
 -Primers to potentially re-evaluate: AKT3, ATG4B, CBARP, INTS8, *ITGA7*, MADD, *MAST1*, *PHF2*, PKN1, NSMCE4A, RAP1GAP, ZNF23
@@ -46,16 +47,51 @@ data_2 <- readxl::read_xlsx("data/251218_qPCR_Calculations.xlsx") %>%
   filter(!is.na(Primers) & Primers != "NA" & CT != "Undetermined") %>%
   mutate(Primers = ifelse(Primers == Target, "Target", Primers),
          UI = paste0(Target,"_", SampleID,"_",Primers))
+=======
+
+```{r DataQC}
+setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
+# setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub")
+data <- read_xlsx("data/data_qPCR_all.xlsx", sheet=1) %>% 
+  filter(!is.na(Primers)  & Primers != "NA" & CT != "Undetermined" & EXPFAIL != "Y") %>%
+  mutate(Primers = ifelse(Target == Primers, "Target", Primers),
+         UI = paste0(Target,"_", SampleID,"_",Primers),
+         Target = ifelse(SampleID == "TARDBP_KD", "TARDBP", Target))
+>>>>>>> Stashed changes
 shRNA_key <- read_xlsx("data/250905_qPCR_RNAs.xlsx", sheet = 1) %>% 
-  dplyr::select(gene, id, shRNA) %>% distinct()
+  dplyr::select(gene, id, shRNA) %>% distinct() 
+batches = rev(unique(data$Plate))
+
+
+## Only keep used shRNA
+shRNA_keep <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Supplementary.xlsx", sheet = 8) %>%
+  filter(`TRC Number` != "N/A")
+shRNA_keep <- shRNA_keep$`TRC Number`
+
+for(i in 1:nrow(shRNA_key)) {
+  trcn <- str_split_i(shRNA_key$shRNA[i], "TRCN", 2) 
+
+  if(!is.na(trcn)){
+    trcn <- str_which(shRNA_keep, trcn)
+    shRNA_key$shRNA[i] = shRNA_keep[trcn]
+  }
+}
+
+shRNA_key <- shRNA_key %>% filter(shRNA %in% c(shRNA_keep, "shCTR", "shTDP-43"))
 
 ## Calculate average CT and sd of CT
+<<<<<<< Updated upstream
 data <- data %>% group_by(Target, SampleID, Primers,UI) %>% 
+=======
+data_summ <- data %>% group_by(Plate,Target, SampleID, Primers,UI) %>% 
+>>>>>>> Stashed changes
   summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
             ct_diff=abs(ct2-ct1),
             avgCT = round(mean(c(ct2,ct1)),2), 
-            sdCT = round(sd(c(ct2,ct1)),2))
+            sdCT = round(sd(c(ct2,ct1)),2)) %>%
+  filter(!is.na(ct_diff))
 
+<<<<<<< Updated upstream
 data_2 <- data_2 %>% group_by(Target, SampleID, Primers,UI) %>% 
   summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
             ct_diff=abs(ct2-ct1),
@@ -92,7 +128,22 @@ prev_redo <- potential_redo[which(potential_redo$UI %in% data$UI),] %>%
          sd_overall = sd(c(ct1_1, ct1_2, ct2_1, ct2_2)))
 
 ## Check all
+=======
+## Replace samples that are re-done in data df and then merge
+df <- data.frame()
+targets <- unique(data$UI)
 
+for(i in targets){
+  df_temp <- data_summ %>% filter(UI == i)
+  rows <- which(df_temp$ct_diff == min(df_temp$ct_diff))
+  
+  df <- rbind(df, df_temp[rows,])
+  
+  rm(df_temp, rows, i)
+}
+>>>>>>> Stashed changes
+
+## Check all
 df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
   filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
   ggplot(aes(x=key, y = ct_diff, fill = Primers))+
@@ -116,8 +167,9 @@ df %>% filter(SampleID %in% c("Ctrl", "TARDBP_KD"))%>%
   geom_hline(yintercept = 0.5, linetype="dotted") 
   labs(title = "Ctrl and TDP-43 KD samples")
   
-df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
-  filter(Primers %in% c("Target", "TARDBP", "GAPDH"))%>%
+df %>% mutate(key = paste0(Target, "_", SampleID),
+              Primers = ifelse(!(Primers %in% c("Target", "TARDBP", "GAPDH")), 
+                               "Target", Primers)) %>%
   ggplot(aes(x=ct1, y = ct2, color = Primers))+
   geom_point(size=3, alpha=0.8)+theme_classic()+
   scale_color_viridis(option = "B", discrete=T, begin = 0, end = 0.8, name="Primers")+
@@ -127,6 +179,7 @@ df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
                   size=3,min.segment.length = 0,
                   max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")
 
+<<<<<<< Updated upstream
 ## Re-do samples with CT difference > 0.5
 potentialRedos <- (df %>% filter(ct_diff > 0.5)) %>% arrange(SampleID) %>% arrange(Primers)
 #write.csv(potentialRedos,"output_tables/251218_qPCR_redo.csv")
@@ -191,9 +244,182 @@ calculate_df_kds %>%
   scale_y_continuous(lim=c(0,2.4), expand=c(0,0))+
   xlab("")+ylab("Relative Expression of Target (2^-ddCT)")+
   facet_wrap(vars(KD), scales = "free_x", ncol=13)+
+=======
+
+```
+
+## Compare log2FC of gene after shRNA vs TDP-43 KD
+dCt = Ct(target gene) - Ct(ref gene)
+ddCT = dCt (kd) - dCT (ctrl)
+
+ddCT (shRNA log2FC)
+ddCT(KD log2FC) for each gene
+
+dCT ctrl = Ct(target) - Ct(ref gene) when target is NA
+
+
+
+```{r ddct}
+## Add shRNA metadata
+df_info <- df %>% left_join(shRNA_key, by = join_by(SampleID == id, Target == gene)) %>% 
+  ungroup() %>%
+  dplyr::select(-c(Plate))  %>%
+  mutate(shRNA = ifelse(Target == "NA", "shCTR", ifelse(Target == "TARDBP", "shTDP", shRNA)))
+
+## Calculate dCT
+df_calc_shRNA <- shRNA_key %>% filter(!(gene %in% c("Ctrl","TARDBP"))) %>%
+  left_join(df_info %>% filter(!(Target %in% c("NA", "TARDBP")), Primers == "Target") %>% 
+              dplyr::select(Target, SampleID, avgCT) %>% 
+              rename(CT_TARGET_shRNA = "avgCT"),
+              by = join_by("id" == "SampleID", "gene" == "Target")) %>%
+    left_join(df_info %>% filter(!(Target %in% c("NA", "TARDBP")), Primers == "GAPDH") %>% 
+                dplyr::select(Target, SampleID, avgCT) %>% 
+                rename(CT_REF_shRNA = "avgCT"),
+              by = join_by("id" == "SampleID", "gene" == "Target")) %>%
+  mutate(dCT_shRNA = CT_TARGET_shRNA - CT_REF_shRNA)
+
+df_calc_ctrl <- shRNA_key %>% filter(!(gene %in% c("Ctrl","TARDBP"))) %>%
+  dplyr::select("gene") %>% unique() %>%
+  left_join(df_info %>% filter(Target == "NA") %>% 
+              dplyr::select(Primers, avgCT) %>% 
+              rename(CT_TARGET_ctrl = "avgCT"),
+            by = join_by("gene" == "Primers")) %>%
+  mutate(CT_REF_ctrl = df_info$avgCT[which(df_info$Target == "NA" & df_info$Primers == "GAPDH")],
+         dCT_ctrl = CT_TARGET_ctrl - CT_REF_ctrl)
+
+df_calc_shTDP <- shRNA_key %>% filter(!(gene %in% c("Ctrl","TARDBP"))) %>%
+  dplyr::select("gene") %>% unique() %>%
+  left_join(df_info %>% filter(Target == "TARDBP") %>% 
+              dplyr::select(Primers, avgCT) %>% 
+              rename(CT_TARGET_shTDP = "avgCT"),
+            by = join_by("gene" == "Primers")) %>%
+  mutate(CT_REF_shTDP = df_info$avgCT[which(df_info$Target == "TARDBP" & df_info$Primers == "GAPDH")],
+         dCT_shTDP = CT_TARGET_shTDP - CT_REF_shTDP)
+
+## Calculate ddCT
+df_calc_shRNA <- df_calc_shRNA %>% dplyr::select(gene, id, shRNA, dCT_shRNA) %>%
+  left_join(df_calc_ctrl %>% dplyr::select(gene, dCT_ctrl),
+            by = "gene") %>%
+  mutate(ddCT_shRNA = round(dCT_shRNA - dCT_ctrl,2), 
+         fc = round(2^(ddCT_shRNA * -1),4))
+df_calc_shTDP <- df_calc_shTDP %>% dplyr::select(gene, dCT_shTDP) %>%
+  left_join(df_calc_ctrl %>% dplyr::select(gene, dCT_ctrl),
+            by = "gene") %>%
+  mutate(ddCT_shTDP = round(dCT_shTDP - dCT_ctrl,2), 
+         fc = round(2^(-ddCT_shTDP),4))
+df_calc <- rbind(df_calc_shRNA %>% dplyr::select(gene, shRNA, fc),
+                 df_calc_shTDP %>% mutate(shRNA = "shTDP") %>% dplyr::select(gene, shRNA, fc))
+
+tdpKDintercept <-  data.frame(gene = df_calc$gene) %>%
+  left_join(df_calc_shTDP, by = "gene") %>%
+  dplyr::select(gene, fc) %>%
+  distinct()
+
+## PLOT LOG2FC w TDP comparison
+df_calc %>%  mutate(col = ifelse(shRNA == "shTDP", "red", "black"),
+                    fc = ifelse(fc > 2, 2, fc)) %>%
+  ggplot(aes(x = shRNA, y = fc)) +
+  geom_hline(data = tdpKDintercept, aes(yintercept = fc), linetype="dotted", color = "red", linewidth=1)+
+  geom_boxplot(outliers = F, alpha=0.5) +
+  geom_jitter(aes(color = col), size = 2, alpha = 0.6,height=0)+
+  theme_classic() + scale_color_manual(values = c("black", "red")) +
+  scale_y_continuous(limits = c(0,2.1), n.breaks = 5,breaks = c(0,0.5,1, 1.5, 2), labels = c(0,0.5,1, 1.5,">=2"))+
+  ylab("") +
+  facet_wrap(vars(gene), scales = "free_x", ncol=14) +
+>>>>>>> Stashed changes
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         panel.border = element_rect(color="black"),
         strip.background = element_rect(fill="#B0DAF1", color="#B0DAF1"),
         strip.text = element_text(face="bold"),
+        text = element_text(size =15),
+        strip.text.x = element_text(size=12),
         legend.position = "none")
+
+## PLOT LOG2FC with TDP comparison (summary)
+df_calc %>% mutate(shRNA = ifelse(!(shRNA %in% c("NA", "shTDP")), "Target", shRNA),
+                   fc = ifelse(fc > 1, 1, fc)) %>%
+  group_by(gene, shRNA) %>% summarize(fc = median(fc))  %>%
+  pivot_wider(names_from = shRNA, values_from = fc) %>%
+  ggplot(aes(x = as.numeric(Target), y = as.numeric(shTDP))) +
+  geom_jitter(size = 4, alpha = 0.6,height=0)+
+  theme_classic() + geom_abline(intercept = 0, slope = 1, color = "#820000", linetype = "dashed") +
+  xlim(0,1) + ylim(0,1)+
+  # scale_y_continuous(limits = c(0,2.1), n.breaks = 5,breaks = c(0,0.5,1, 1.5, 2), labels = c(0,0.5,1, 1.5,">=2"))+
+  ylab("shTDP GEX FC") +xlab("shTarget GEX FC") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        text = element_text(size =15),
+        legend.position = "none")
+
+
+## Calculate ddCT of TDP-43 in all conditions
+df_calc_TDP <- df_info %>% filter(Primers == "TARDBP") %>%
+  left_join(df_info %>% filter(!(Target %in% c("NA", "TARDBP")), Primers == "TARDBP") %>% 
+              dplyr::select(Target, SampleID, avgCT) %>% 
+              rename(CT_TDP_shRNA = "avgCT"),
+              by = join_by(SampleID, Target)) %>%
+  left_join(df_info %>% filter(!(Target %in% c("NA", "TARDBP")), Primers == "GAPDH") %>% 
+                dplyr::select(Target, SampleID, avgCT) %>% 
+                rename(CT_REF_shRNA = "avgCT"),
+              by = join_by(SampleID, Target)) %>%
+  dplyr::select(-avgCT) %>%
+  rbind(df_info %>% filter(Target == "TARDBP", Primers == "TARDBP") %>%
+        rename(CT_TDP_shRNA = "avgCT") %>%
+        mutate(CT_REF_shRNA =  (df_info %>% filter(Target == "TARDBP", Primers == "GAPDH"))$avgCT)) %>% 
+  mutate( CT_TDP_ctrl = (df_info %>% filter(Target == "NA", Primers == "TARDBP") %>% 
+              dplyr::select(SampleID, avgCT))$avgCT) %>%
+  mutate( CT_REF_ctrl = (df_info %>% filter(Target == "NA", Primers == "GAPDH") %>% 
+              dplyr::select(SampleID, avgCT))$avgCT) %>%
+  mutate(dCT_TDP_shRNA = CT_TDP_shRNA - CT_REF_shRNA,
+         dCT_TDP_Ctrl = CT_TDP_ctrl - CT_REF_ctrl,
+         ddCT = dCT_TDP_shRNA - dCT_TDP_Ctrl,
+         fc = 2^(-ddCT),
+         key = paste0(Target, ": ",shRNA),
+         key = ifelse(shRNA == "shTDP", "shTDP-43", ifelse(shRNA == "shCTR", "Ctrl", key)),
+         key = str_remove_all(key,"0")) %>%
+  filter(!is.na(fc)) 
+
+shRNA_plot <- df_calc_TDP %>% group_by(Target, shRNA) %>% summarise(fc = mean(fc))
+shRNA_dup <- shRNA_plot$Target[which(duplicated(shRNA_plot$Target))]
+
+for(i in shRNA_dup) {
+  df_temp <- shRNA_plot %>% filter(Target == i)
+  trc <- df_temp$shRNA[which(df_temp$fc == max(df_temp$fc))]
+  shRNA_plot <-  shRNA_plot %>% filter(shRNA != trc)
+}
+
+order_tdpshRNA <- (df_calc_TDP %>% filter(shRNA %in% c(shRNA_plot$shRNA, "shTDP")) %>% 
+                     group_by(Target) %>% summarize(orderMean = mean(fc, na.rm=T), ordersd = sd(fc)) %>% filter(orderMean < 1, ordersd < 0.1 | is.na(ordersd)) %>% arrange(orderMean))$Target
+
+## Plot TDP-43 RNA levels in single target knockdowns with sdFC < 0.1
+df_calc_TDP %>% filter(Target %in% order_tdpshRNA & shRNA %in% c(shRNA_plot$shRNA, "shTDP"))%>%
+  mutate( Target = factor(Target, order_tdpshRNA)) %>%
+  ggplot(aes(x = Target, y = fc, fill=fc)) +
+  geom_boxplot(outliers = F, alpha=0.8) +
+  geom_jitter(size = 2, alpha = 0.6,height=0)+
+  theme_classic() +
+  scale_fill_gradient(low = "#820000", high="white", lim = c(0,1))+
+  scale_y_continuous(limits = c(0,1.05), n.breaks = 4,breaks = c(0,0.25,0.5,0.75, 1), expand = c(0,0))+
+  ylab("") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        text = element_text(size =15))
+
+df_plot <- df_calc_TDP %>%
+  filter(Target %in% order_tdpshRNA &
+         shRNA %in% c(shRNA_plot$shRNA, "shTDP")) %>%
+  group_by(Target) %>%
+  mutate(fc_group = median(fc, na.rm = TRUE)) %>%   
+  ungroup() %>%
+  mutate(Target = factor(Target, order_tdpshRNA))
+
+ggplot(df_plot, aes(x = Target, y = fc, fill = fc_group)) +
+  geom_boxplot(outliers = FALSE, alpha = 0.8) +
+  geom_jitter(size = 2, alpha = 0.6, height = 0) +
+  theme_classic() +
+  scale_fill_gradient(low = "#820000", high = "white", limits = c(0,1)) +
+  scale_y_continuous(limits = c(0,1.1),
+                     breaks = c(0,0.25,0.5,0.75,1),
+                     expand = c(0,0)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        text = element_text(size = 15))
+
 ```
