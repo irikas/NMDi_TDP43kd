@@ -1,0 +1,67 @@
+---
+title: "260330_Proteomics_"
+author: "Irika Sinha"
+date: "2026-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install packages
+
+```{r packages, message=FALSE, warning=FALSE}
+library("BiocManager")
+packages <- c("tidyverse","viridis", "ggplot2", "readxl", "UpSetR")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F, quietly = T)
+  } else if (!(BiocManager::valid(i))){
+    BiocManager::install(pkgs = i, ask = F, update = T, quietly = T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+```{r data}
+setwd('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo')
+df_deps <- readxl::read_xlsx('data/Kozareva_proteomics.xlsx', sheet=1)
+
+## cryptic and skiptic exons
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
+  dplyr::select(gene_symbol,ensembl_id, maxPSI_Ctrl, avgPSI_sgTARDBP, maxPSI_sgTARDBP)                                                                                                                                               
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% 
+  dplyr::select(gene_symbol,ensembl_id, maxPSI_Ctrl, avgPSI_sgTARDBP, maxPSI_sgTARDBP) 
+
+df_ces <- rbind(cryptic_df,skiptic_df) %>% 
+  mutate(gene_NMD = ifelse(avgPSI_sgTARDBP < 10,
+                           ifelse(avgPSI_sgTARDBP < 5, "5pct", "10pct"),
+                           "TDP-43 KD only")) %>%
+  group_by(gene_symbol, ensembl_id, gene_NMD) %>% summarise(psi_max = max(maxPSI_sgTARDBP))
+
+## Compare?
+df <- left_join(df_ces,
+                df_deps %>% dplyr::select(c(ensgene, (contains("prot")))), 
+                by = join_by("ensembl_id" == "ensgene"))
+
+df %>% mutate(lab = ifelse(abs(log2FC_prot) > 1, gene_symbol, "")) %>% 
+  group_by(gene_name) %>% 
+  ggplot(aes(x = maxPSI_sgTARDBP, y = log2FC_prot)) +
+  geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + 
+  theme_classic() + 
+  # gghighlight(gene_NMD != "TDP-43 KD only",unhighlighted_params = list(alpha=0.8, size=5, shape = 16))+
+  scale_fill_manual(values=c("#69140E","#e5a4cb", "#363636")) +
+  theme(text = element_text(family="Helvetica")) + 
+    ggrepel::geom_text_repel(aes(label = lab))
+```
