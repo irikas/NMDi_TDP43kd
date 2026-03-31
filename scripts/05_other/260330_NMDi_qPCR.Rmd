@@ -1,0 +1,62 @@
+---
+title: "260330_NMDi_qPCR"
+author: "Irika Sinha"
+date: "2026-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install packages
+
+```{r packages, message=FALSE, warning=FALSE}
+library("BiocManager")
+packages <- c("tidyverse","viridis", "ggplot2")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F, quietly = T)
+  } else if (!(BiocManager::valid(i))){
+    BiocManager::install(pkgs = i, ask = F, update = T, quietly = T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+## Plot NMDi
+```{r dataPlot}
+df <- read_csv("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/qPCR/qPCR_NMDi_analysis.csv",
+               col_names = T) %>% pivot_longer(starts_with("i3N_"), names_to = "condition", values_to = "normExp") %>%
+  mutate(condition = str_split_i(condition,"_",2))
+
+df_summarized <- df %>% group_by(condition, gene) %>% mutate(normExp = ifelse(normExp > 1.5, 1.5, normExp)) %>% 
+  summarize(meanExp = mean(normExp))  %>% filter(condition != "empty" & condition != "shScramble")
+
+df %>% mutate(normExp = ifelse(normExp > 1, 1.5, normExp)) %>%
+  filter(condition != "empty" & condition != "shScramble") %>%
+  ggplot(aes(x=condition,y=normExp, fill = gene)) + 
+  geom_col(data=df_summarized,aes(x=condition,y=meanExp, fill = gene),
+           alpha = 0.8,position = position_dodge()) +
+  geom_point(aes(group=gene, fill = gene),
+             position = position_jitterdodge(dodge.width = 1),
+             size = 5, alpha=0.8, color = "black", shape = 21,
+             stroke=2) +
+  # geom_hline(yintercept = 1, linetype="dashed")+
+  theme_classic() + 
+  ylim(0,1.6)+
+  scale_fill_viridis(discrete = T)+
+  scale_color_viridis(discrete = T)
+
+
+```
