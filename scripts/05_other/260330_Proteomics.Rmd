@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r packages, message=FALSE, warning=FALSE}
 library("BiocManager")
-packages <- c("tidyverse","viridis", "ggplot2", "readxl", "UpSetR")
+packages <- c("tidyverse","viridis", "ggplot2", "readxl", "UpSetR","gghighlight")
 
 for(i in packages){
   if(!(i %in% rownames(installed.packages()))){
@@ -33,6 +33,11 @@ data.frame(versions)
 rm(versions)
 
 ```
+## Data from i3N and patient proteomics
+Integrative multiomic analysis links TDP-43-driven splicing defects to cascading proteomic disruption of ALS/FTD pathways
+Velina Kozareva, Zhengde Liu, Keyana Blake, Yue A. Qi, Sasha Rollinson, Sahba Seddighi, Mohammad Alsaidi, Stanislav Tsitkov, Mercedes Prudencio, Leonard Petrucelli, Dennis W. Dickson, Anna-Leigh Brown, Pietro Fratta, Hong Joo Kim, J. Paul Taylor, Michael E. Ward, Ernest Fraenkel, Sarah E. Kargbo-Hill
+bioRxiv 2025.09.29.679403; doi: https://doi.org/10.1101/2025.09.29.679403
+
 
 ```{r data}
 setwd('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo')
@@ -48,20 +53,43 @@ df_ces <- rbind(cryptic_df,skiptic_df) %>%
   mutate(gene_NMD = ifelse(avgPSI_sgTARDBP < 10,
                            ifelse(avgPSI_sgTARDBP < 5, "5pct", "10pct"),
                            "TDP-43 KD only")) %>%
-  group_by(gene_symbol, ensembl_id, gene_NMD) %>% summarise(psi_max = max(maxPSI_sgTARDBP))
+  group_by(gene_symbol, ensembl_id) %>% summarise(psi_max = max(maxPSI_sgTARDBP), gene_NMD = str_flatten_comma(unique(gene_NMD))) %>%
+  mutate(gene_NMD = ifelse(str_detect(gene_NMD, "5pct"),"5pct", ifelse(str_detect(gene_NMD, "10pct"), "10pct","TDP-43 KD only")))
 
 ## Compare?
 df <- left_join(df_ces,
                 df_deps %>% dplyr::select(c(ensgene, (contains("prot")))), 
                 by = join_by("ensembl_id" == "ensgene"))
 
-df %>% mutate(lab = ifelse(abs(log2FC_prot) > 1, gene_symbol, "")) %>% 
-  group_by(gene_name) %>% 
-  ggplot(aes(x = maxPSI_sgTARDBP, y = log2FC_prot)) +
+df %>% mutate(lab = ifelse(abs(log2FC_prot) > 0.5, gene_symbol, "")) %>% 
+  ggplot(aes(x = psi_max, y = log2FC_prot)) +
   geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + 
   theme_classic() + 
   # gghighlight(gene_NMD != "TDP-43 KD only",unhighlighted_params = list(alpha=0.8, size=5, shape = 16))+
-  scale_fill_manual(values=c("#69140E","#e5a4cb", "#363636")) +
-  theme(text = element_text(family="Helvetica")) + 
-    ggrepel::geom_text_repel(aes(label = lab))
+  ggrepel::geom_text_repel(aes(label = lab), min.segment.length = 1)+
+  scale_fill_manual(values=c("#69140E","#e5a4cb", "#BFBFBF")) +
+  theme(text = element_text(family="Helvetica")) 
+
+
+#PATIENTS?
+df_deps_pm <- readxl::read_xlsx('data/Kozareva_proteomics.xlsx', sheet=15)
+df_pm <- left_join(df_ces,
+                df_deps_pm %>% dplyr::select(c(external_gene_name, (contains("prot")))) %>% dplyr::select(!c(contains("t__prot"), starts_with("pval__prot"))), 
+                by = join_by("gene_symbol" == "external_gene_name")) %>%
+  pivot_longer(cols = c(starts_with("log2fc__prot__")), values_to = "log2fc", names_prefix = "log2fc__prot__",  names_to = "dataset") %>%
+  pivot_longer(cols = c(starts_with("adjpval__prot__")), values_to = "padj", names_prefix = "adjpval__prot__",  names_to = "dataset_p") %>%
+  filter(dataset == dataset_p, !is.na(log2fc), str_detect(dataset,"Guise"), dataset!= "Guise_ALS_MNs_non") %>% dplyr::select(-dataset_p) 
+
+df_pm %>% 
+  mutate(dataset = factor(dataset, c("Guise_ALS_MNs_mld", "Guise_ALS_MNs_mod", "Guise_ALS_MNs_sev")),
+         log2fc = ifelse(log2fc > 2, 2, ifelse(log2fc < -2, -2, log2fc))) %>%
+  ggplot(aes(x = log2fc, y = -log10(padj))) +
+  geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + 
+  theme_classic() + 
+  ggrepel::geom_text_repel(aes(label = gene_symbol), min.segment.length = 0, size = 5, max.overlaps = 5)+
+  scale_fill_manual(values=c("#69140E","#e5a4cb", "#BFBFBF")) +
+  theme(text = element_text(family="Helvetica")) +
+  facet_wrap(vars(dataset), scales="fixed",nrow =2)
+  
+
 ```
