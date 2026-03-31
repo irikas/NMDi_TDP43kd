@@ -33,21 +33,6 @@ rm(versions)
 ```
 
 ## Data QC
-<<<<<<< Updated upstream
-11/17/2025
--KALRN #7-21 & #7-22 were not amplified (no primer added)
--Primers to potentially re-evaluate: AKT3, ATG4B, CBARP, INTS8, *ITGA7*, MADD, *MAST1*, *PHF2*, PKN1, NSMCE4A, RAP1GAP, ZNF23
-
-```{r DataQC}
-setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
-data <- read_csv("data/251117_qPCR_data.csv") %>% 
-  filter(!is.na(Primers)  & Primers != "NA" & CT != "Undetermined") %>%
-  mutate(UI = paste0(Target,"_", SampleID,"_",Primers))
-data_2 <- readxl::read_xlsx("data/251218_qPCR_Calculations.xlsx") %>% 
-  filter(!is.na(Primers) & Primers != "NA" & CT != "Undetermined") %>%
-  mutate(Primers = ifelse(Primers == Target, "Target", Primers),
-         UI = paste0(Target,"_", SampleID,"_",Primers))
-=======
 
 ```{r DataQC}
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
@@ -57,7 +42,7 @@ data <- read_xlsx("data/data_qPCR_all.xlsx", sheet=1) %>%
   mutate(Primers = ifelse(Target == Primers, "Target", Primers),
          UI = paste0(Target,"_", SampleID,"_",Primers),
          Target = ifelse(SampleID == "TARDBP_KD", "TARDBP", Target))
->>>>>>> Stashed changes
+
 shRNA_key <- read_xlsx("data/250905_qPCR_RNAs.xlsx", sheet = 1) %>% 
   dplyr::select(gene, id, shRNA) %>% distinct() 
 batches = rev(unique(data$Plate))
@@ -80,55 +65,13 @@ for(i in 1:nrow(shRNA_key)) {
 shRNA_key <- shRNA_key %>% filter(shRNA %in% c(shRNA_keep, "shCTR", "shTDP-43"))
 
 ## Calculate average CT and sd of CT
-<<<<<<< Updated upstream
 data <- data %>% group_by(Target, SampleID, Primers,UI) %>% 
-=======
-data_summ <- data %>% group_by(Plate,Target, SampleID, Primers,UI) %>% 
->>>>>>> Stashed changes
   summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
             ct_diff=abs(ct2-ct1),
             avgCT = round(mean(c(ct2,ct1)),2), 
             sdCT = round(sd(c(ct2,ct1)),2)) %>%
   filter(!is.na(ct_diff))
 
-<<<<<<< Updated upstream
-data_2 <- data_2 %>% group_by(Target, SampleID, Primers,UI) %>% 
-  summarize(ct1 = round(as.numeric(list(CT)[1][[1]][1]),2), ct2=round(as.numeric(list(CT)[1][[1]][2]),2),
-            ct_diff=abs(ct2-ct1),
-            avgCT = round(mean(c(ct2,ct1)),2), 
-            sdCT = round(sd(c(ct2,ct1)),2))
-
-## Replace samples that are re-done in data df and then merge
-# Data #2 includes samples re-done due to Ct differences > 0.5
-df <- data.frame()
-df_2 <- data_2
-
-for(i in 1:nrow(data)){
-  # Was this experiment re-done?
-  if(data$UI[i] %in% df_2$UI){
-    row = which(df_2$UI == data$UI[i]) # Identify row for new experiment
-    df <- rbind(df, df_2[row,]) # Add new data
-    df_2 <- df_2[-row,] # remove from df_2
-    rm(row)
-  } else{
-    # Experiment was not re-done
-    df <- rbind(df, data[i,]) # Add original data
-  }
-  rm(i)
-}
-
-df <- rbind(df, df_2)
-
-# Does not pass - check against first two values
-potential_redo <- df %>% filter(ct_diff > 0.5)
-prev_redo <- potential_redo[which(potential_redo$UI %in% data$UI),] %>%
-  left_join(data, by = c("Target", "SampleID","Primers","UI"), suffix = c("_2","_1")) %>%
-  rowwise() %>%
-  mutate(avg_overall = mean(c(ct1_1, ct1_2, ct2_1, ct2_2)),
-         sd_overall = sd(c(ct1_1, ct1_2, ct2_1, ct2_2)))
-
-## Check all
-=======
 ## Replace samples that are re-done in data df and then merge
 df <- data.frame()
 targets <- unique(data$UI)
@@ -141,7 +84,6 @@ for(i in targets){
   
   rm(df_temp, rows, i)
 }
->>>>>>> Stashed changes
 
 ## Check all
 df %>% mutate(key = paste0(Target, "_", SampleID)) %>%
@@ -178,11 +120,6 @@ df %>% mutate(key = paste0(Target, "_", SampleID),
   geom_text_repel(aes(label=ifelse(ct_diff>0.5,SampleID,"")),
                   size=3,min.segment.length = 0,
                   max.time=2,max.overlaps=20, nudge_y = 0.1,  direction="both")
-
-<<<<<<< Updated upstream
-## Re-do samples with CT difference > 0.5
-potentialRedos <- (df %>% filter(ct_diff > 0.5)) %>% arrange(SampleID) %>% arrange(Primers)
-#write.csv(potentialRedos,"output_tables/251218_qPCR_redo.csv")
 
 
 ```
@@ -244,7 +181,6 @@ calculate_df_kds %>%
   scale_y_continuous(lim=c(0,2.4), expand=c(0,0))+
   xlab("")+ylab("Relative Expression of Target (2^-ddCT)")+
   facet_wrap(vars(KD), scales = "free_x", ncol=13)+
-=======
 
 ```
 
@@ -326,7 +262,6 @@ df_calc %>%  mutate(col = ifelse(shRNA == "shTDP", "red", "black"),
   scale_y_continuous(limits = c(0,2.1), n.breaks = 5,breaks = c(0,0.5,1, 1.5, 2), labels = c(0,0.5,1, 1.5,">=2"))+
   ylab("") +
   facet_wrap(vars(gene), scales = "free_x", ncol=14) +
->>>>>>> Stashed changes
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         panel.border = element_rect(color="black"),
         strip.background = element_rect(fill="#B0DAF1", color="#B0DAF1"),

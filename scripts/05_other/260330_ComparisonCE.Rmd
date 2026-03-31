@@ -1,0 +1,117 @@
+---
+title: "260330_ComparisonCE"
+author: "Irika Sinha"
+date: "2026-03-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install packages
+
+```{r packages, message=FALSE, warning=FALSE}
+library("BiocManager")
+packages <- c("tidyverse", "readxl","data.table","UpSetR")
+
+for(i in packages){
+  if(!(i %in% rownames(installed.packages()))){
+    BiocManager::install(pkgs = i, ask = F, quietly = T)
+  } else if (!(BiocManager::valid(i))){
+    BiocManager::install(pkgs = i, ask = F, update = T, quietly = T)
+  }
+  library(package = i, character.only = T, quietly = T)
+  rm(i)
+}
+
+rm(packages)
+
+## List Package Versions
+versions = installed.packages()[names(sessionInfo()$otherPkgs), "Version"]
+data.frame(versions)
+rm(versions)
+
+```
+
+## Load data
+```{r data}
+## LC results (sinha)
+sinha_tdpkd <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Supplementary.xlsx", sheet = "ST2") 
+sinha_tdpkdnmd_ctrl <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Supplementary.xlsx", sheet = "ST1") 
+sinha_tdpkdnmd_tdpkd <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Supplementary.xlsx", sheet = "ST4")
+
+sinha_genes <- unique(c(sinha_tdpkdnmd_ctrl$genes, sinha_tdpkd$genes, sinha_tdpkdnmd_tdpkd$genes))
+
+## LC results (Zeng)
+Zeng_tdpkd <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Zeng_Tables/table_S5_cryptic-splicing-events-in-TDP-43-KD-vs-control-samples.csv") %>%
+  filter(FDR < 0.05) %>% mutate(intron = paste0(intron_start,"-", intron_end))
+Zeng_11j_only <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Zeng_Tables/table_S6_cryptic-splicing-events-in-11j-treatment-vs-control-samples.csv") %>% filter(FDR < 0.05) %>% mutate(intron = paste0(intron_start,"-", intron_end))
+Zeng_tdpkd_11j_tdpkd <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Zeng_Tables/table_S8_cryptic-splicing-events-in-TDP-43kD-11j-treatment-vs-TDP-43-KD-samples.csv") %>% filter(FDR < 0.05) %>% mutate(intron = paste0(intron_start,"-", intron_end))
+Zeng_tdpkd_11j_ctrl <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/Zeng_Tables/table_S7_cryptic-splicing-events-in-TDP-43kD-11j-treatment-vs-control-samples.csv") %>% filter(FDR < 0.05) %>% mutate(intron = paste0(intron_start,"-", intron_end)) %>% filter(intron %in% c(Zeng_tdpkd_11j_tdpkd$intron, Zeng_tdpkd$intron))
+
+## Subset Zeng to TDP43kd + NMDi targets (rm NMDi only targets)
+Zeng_df_withNMDI <- Zeng_tdpkd_11j_ctrl %>% pivot_longer(starts_with("TDP"), names_to = "condition", values_to = "PSI") %>% dplyr::select(gene, intron, condition,PSI) 
+Zeng_df_noNMDi <- Zeng_tdpkd %>% pivot_longer(c("SCR_DMSO", "TDP43KD_DMSO"), names_to = "condition", values_to = "PSI") %>% dplyr::select(gene, intron, condition,PSI) 
+Zeng_df <- rbind(Zeng_df_withNMDI, Zeng_df_noNMDi) %>% pivot_wider(names_from = "condition", values_from = "PSI") %>% 
+  filter(!(intron %in% Zeng_11j_only$intron) & !is.na(TDP43KD_11j))
+
+zeng_genes <- unique(Zeng_df$gene)
+
+## LC results (ALB)
+ALB_targets <- fread("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/ALB_tables/ALB_analysed.csv") 
+ALB_genes <- unique((ALB_targets%>% filter(`False positive rate` < 0.05))$gene_name )
+
+```
+
+## Plot overlap in genes with CE
+```{r PlotOverlap}
+lt <- list("sinha" = sinha_genes, 
+           "zeng"= zeng_genes,
+           "ALbrown" = ALB_genes)
+
+upset(fromList(lt), order.by = "freq",
+      mb.ratio = c(0.8,0.2), 
+      intersections = list(list('sinha', 'zeng'), 
+                           list('sinha', 'ALbrown'),
+                           list('zeng', 'ALbrown'),
+                           list('sinha', 'zeng', 'ALbrown')),
+      line.size = 2, point.size = 5, show.numbers = F, set_size.show = T)
+```
+
+## Plot overlap in genes with CE
+```{r TDPsensitive}
+## Dark cryptic (ALB)
+ALB_tdpgenes_nmd <- ALB_targets %>% filter(`False positive rate` < 0.05) %>% mutate(NMD_id ="sgTDPonly")
+ALB_tdpgenes_nmd$NMD_id[which(ALB_tdpgenes_nmd$`Dark event only in NMDi`)] = "NMDreveal"
+
+## Zeng
+Zeng_df <- Zeng_df %>%  mutate(NMD_id = ifelse(is.na(TDP43KD_DMSO), "NMDreveal", "sgTDPonly"))
+
+## Plot
+df_pct <- rbind(ALB_tdpgenes_nmd %>% dplyr::select(gene_name, NMD_id) %>% mutate(dataset = "ALB") %>% rename("gene" = "gene_name") %>% distinct(),
+                Zeng_df %>% dplyr::select(gene, NMD_id) %>% mutate(dataset = "zeng")%>% distinct()) 
+df_pct
+df_pct <- as.data.frame(table(df_pct$dataset, df_pct$NMD_id) ) %>% pivot_wider(names_from="Var2", values_from = "Freq") %>%
+  mutate(NMD = round(NMDreveal/(NMDreveal+sgTDPonly),2), TDP= 1-NMD) %>% pivot_longer(c(NMD,TDP), names_to = "condition", values_to = "pct")
+
+df_pct %>% 
+  ggplot(aes(x = Var1,
+             y = pct,
+             fill = condition)) +
+  geom_col() +  
+  xlab("")+ 
+  ylab("% genes")+
+  scale_y_continuous(expand = c(0,0), lim = c(0,1), ) +
+  theme_classic() + 
+  scale_fill_discrete(palette= c("#D1D1D1","#262626")) +
+  theme(legend.position = "right", text = element_text(size=15)) 
+
+
+
+
+
+
+
+
+```
