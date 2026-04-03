@@ -40,13 +40,12 @@ bioRxiv 2025.09.29.679403; doi: https://doi.org/10.1101/2025.09.29.679403
 
 
 ```{r data}
-setwd('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo')
-df_deps <- readxl::read_xlsx('data/Kozareva_proteomics.xlsx', sheet=1)
+df_deps <- readxl::read_xlsx('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/Kozareva_proteomics.xlsx', sheet=1)
 
 ## cryptic and skiptic exons
-cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% 
   dplyr::select(gene_symbol,ensembl_id, maxPSI_Ctrl, avgPSI_sgTARDBP, maxPSI_sgTARDBP)                                                                                                                                               
-skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% 
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% 
   dplyr::select(gene_symbol,ensembl_id, maxPSI_Ctrl, avgPSI_sgTARDBP, maxPSI_sgTARDBP) 
 
 df_ces <- rbind(cryptic_df,skiptic_df) %>% 
@@ -66,13 +65,13 @@ df %>% mutate(lab = ifelse(abs(log2FC_prot) > 0.5, gene_symbol, "")) %>%
   geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + 
   theme_classic() + 
   # gghighlight(gene_NMD != "TDP-43 KD only",unhighlighted_params = list(alpha=0.8, size=5, shape = 16))+
-  ggrepel::geom_text_repel(aes(label = lab), min.segment.length = 1)+
+  # ggrepel::geom_text_repel(aes(label = lab), min.segment.length = 1)+
   scale_fill_manual(values=c("#69140E","#e5a4cb", "#BFBFBF")) +
   theme(text = element_text(family="Helvetica")) 
 
 
 #PATIENTS?
-df_deps_pm <- readxl::read_xlsx('data/Kozareva_proteomics.xlsx', sheet=15)
+df_deps_pm <- readxl::read_xlsx('/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Projects/NMD/NotGitHub/data/Kozareva_proteomics.xlsx', sheet=15)
 df_pm <- left_join(df_ces,
                 df_deps_pm %>% dplyr::select(c(external_gene_name, (contains("prot")))) %>% dplyr::select(!c(contains("t__prot"), starts_with("pval__prot"))), 
                 by = join_by("gene_symbol" == "external_gene_name")) %>%
@@ -86,10 +85,11 @@ df_pm %>%
   ggplot(aes(x = log2fc, y = -log10(padj))) +
   geom_point(alpha=0.8,size=5, aes(fill = factor(gene_NMD)), shape = 21, color = "#363636") + 
   theme_classic() + 
-  ggrepel::geom_text_repel(aes(label = gene_symbol), min.segment.length = 0, size = 5, max.overlaps = 5)+
+  ggrepel::geom_text_repel(aes(label = gene_symbol), min.segment.length = 0, size = 7, max.overlaps = 5)+
   scale_fill_manual(values=c("#69140E","#e5a4cb", "#BFBFBF")) +
-  theme(text = element_text(family="Helvetica")) +
-  facet_wrap(vars(dataset), scales="fixed",nrow =2)
+  theme(text = element_text(family="Helvetica"), legend.position = "none",
+        panel.spacing = unit(1, "cm", data = NULL)) +
+  facet_wrap(vars(dataset), scales="fixed",nrow =1)
   
 
 ```
