@@ -38,8 +38,10 @@ Create a new dataframe with splice junction counts from each sample for relevant
 
 ```{r mergeSJ, eval=FALSE, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ### Load cryptic files
-cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2)[,1:19]
-skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3)[,1:6]
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/260408_TDP43-NMD_Tables_Main.xlsx", 
+                                sheet = 2)[,1:19]
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/260408_TDP43-NMD_Tables_Main.xlsx", 
+                                sheet = 3)[,1:6]
 
 ## Clean up junctions - cryptic_df
 for(i in c(5:6,18:19)){
@@ -104,7 +106,7 @@ finaldf <- finaldf %>% filter(Condition != "FALSE") %>%
               values_fn = function(x) mean(x, na.rm=T),  # Average splice junction counts between duplicates
               id_cols = "Coordinates")
 
-# write.csv(finaldf,"output_tables/251224_SpliceJunctions_Cleaned.csv",row.names = F)
+# write.csv(finaldf,"output_tables/260408_SpliceJunctions_Cleaned.csv",row.names = F)
 # write.csv(uniqueJunctions[which(!(uniqueJunctions %in% finaldf$Coordinates))],"output_tables/251224_TestJunctions.csv")
 ```
 
@@ -113,7 +115,7 @@ Separately calculate PSIs for cryptic and skiptic exons using the values from th
 
 
 ```{r calcPSI, eval=FALSE, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
-junctionCountdf <- fread("output_tables/251224_SpliceJunctions_Cleaned.csv")
+junctionCountdf <- finaldf
 
 ## Create new dataframe to populate with splice junction counts: cryptic exons
 cryptic_df_fill = cryptic_df
@@ -178,8 +180,9 @@ for(i in 1:nrow(cryptic_df_fill)){
 
 cryptic_df_fill <- cryptic_df_fill %>% arrange(canonical_splice_junction) %>% 
   arrange(cryptic_exon_coordinates) %>% arrange(gene_symbol) 
-cryptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 1:422))
-# write.csv(cryptic_df_fill,"output_tables/251224_CrypticCoordinates.csv", row.names = F)
+cryptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 1:419))
+
+# write.csv(cryptic_df_fill,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/260408_CrypticCoordinates.csv", row.names = F)
 
 ## Create new dataframe to populate with splice junction counts: SKIPTIC exons
 skiptic_df_fill = skiptic_df
@@ -214,8 +217,8 @@ for(i in 1:nrow(skiptic_df_fill)){
   
 }
 
-skiptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 423:432))
-# write.csv(skiptic_df_fill,"output_tables/251224_SkipticCoordinates.csv", row.names = F)
+skiptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 420:429))
+# write.csv(skiptic_df_fill,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/260408_SkipticCoordinates.csv", row.names = F)
 
 ```
 
@@ -223,22 +226,22 @@ skiptic_df_fill$cryptic_exon_id <- paste0("CE", sprintf("%03d", 423:432))
 ## Create Summary columns
 Find rowwise means/avgs per condition, etc.
 
-```{r SummaryColumns, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
+```{r SummaryColumns, eval=FALSE,  fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## Create one table with only gene symbol, ensembl id, ce id, and PSIs
-cryptic_df_fill_subset <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>%  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,type,starts_with("avgPSI_")))
+cryptic_df_fill_subset <- cryptic_df_fill %>%  dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,type,starts_with("avgPSI_")))
 
-skiptic_df_subset <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_"))) %>% 
+skiptic_df_subset <- skiptic_df_fill %>% dplyr::select(c(gene_symbol,ensembl_id,cryptic_exon_id,starts_with("avgPSI_"))) %>% 
   mutate(type="skiptic") %>% relocate(type, .after=cryptic_exon_id)
 
 df <- rbind(cryptic_df_fill_subset,skiptic_df_subset)
 df[is.na(df)] = 0
 
 # Add max
-df$maxPSI_Ctrl = apply(df %>% dplyr::select(!contains("avgPSI_sgTARDBP") & contains("avgPSI") ),1,function(x) max(x, na.rm=T))
-df$maxPSI_sgTARDBP = apply(df %>% dplyr::select(contains("avgPSI_sgTARDBP")),1,function(x) max(x, na.rm=T))
+df$maxPSI_Ctrl = apply(df %>% dplyr::select(!contains("avgPSI_T") & contains("avgPSI") ),1,function(x) max(x, na.rm=T))
+df$maxPSI_sgTARDBP = apply(df %>% dplyr::select(contains("avgPSI_T")),1,function(x) max(x, na.rm=T))
 df$maxPSI_Diff = df$maxPSI_sgTARDBP-df$maxPSI_Ctrl
 
-# write.csv(df,"output_tables/251225_cetable_psi.csv", row.names = F)
+# write.csv(df,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/260408_cetable_psi.csv", row.names = F)
 ```
 
 ## Basic Visualizations of cryptic exons
@@ -288,8 +291,8 @@ pieChartFx = function(dfCol, naValue = F, cols = c("#262626","#D1D1D1")){
 
 ```{r VisPieChart, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ### Load cryptic files
-cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% mutate(chr = str_split_i(canonical_splice_junction,":",1))
-skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% mutate(type = "skiptic") %>% mutate(chr = str_split_i(skiptic_junction,":",1))
+cryptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/260408_TDP43-NMD_Tables_Main.xlsx", sheet = 2) %>% mutate(chr = str_split_i(canonical_splice_junction,":",1))
+skiptic_df <- readxl::read_xlsx("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Papers/NMD/02_Revisions/260331_SharedCopies/260408_TDP43-NMD_Tables_Main.xlsx", sheet = 3) %>% mutate(type = "skiptic") %>% mutate(chr = str_split_i(skiptic_junction,":",1))
 
 # Set wd for new figures
 setwd("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/")
@@ -315,8 +318,20 @@ table(df$Inframe)
 # Visualize the difference in CE inclusion rates with NMDi
 
 ```{r NMDplots, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
+## Create table 4
+df_write <- df %>% mutate(avgPSI_sgTARDBP = as.numeric(avgPSI_sgTARDBP),
+                          category = ifelse(avgPSI_sgTARDBP <= 10, 
+                                            ifelse(avgPSI_sgTARDBP <= 5, 
+                                                   ifelse(avgPSI_sgTARDBP <= 1, 
+                                                          "1pct", "5pct"), "10pct"), 
+                                            "TDPKDonly"),
+                          category = ifelse(is.na(avgPSI_sgTARDBP), "1pct", category)) %>%
+  filter(category != "TDPKDonly")
+# write.csv(df_write,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/260408_table4_nmdsensitive.csv", row.names = F)
+
 # Create a df with CEs labeled as per cut-off for TDP-43kd only PSIs
-df_NMD <- df %>% mutate(NMDonly10pct = ifelse(avgPSI_sgTARDBP <= 10, "10pct", "TDPKDonly"),
+df_NMD <- df %>% mutate(avgPSI_sgTARDBP = as.numeric(avgPSI_sgTARDBP),
+                        NMDonly10pct = ifelse(avgPSI_sgTARDBP <= 10, "10pct", "TDPKDonly"),
                         NMDonly5pct = ifelse(avgPSI_sgTARDBP <= 5, "5pct", "TDPKDonly"),
                         NMDonly1pct = ifelse(avgPSI_sgTARDBP <= 1, "1pct", "TDPKDonly")) %>%
   pivot_longer(cols=c("NMDonly10pct","NMDonly5pct","NMDonly1pct"), 
@@ -343,9 +358,11 @@ df_NMD %>% ggplot(aes(x=NMDonly,fill=category))+geom_bar()+
 
 ### Plots to look at dPSI as a result of NMDi 
 # Create new dataframe
+df_NMD[,c(7:19)] = apply(df_NMD[,c(7:19)] ,MARGIN = 2, function(x) as.numeric(x))
 df_NMD <- df_NMD %>% 
   dplyr::select(gene_symbol,ensembl_id, cryptic_exon_id,type, Inframe, starts_with("avgPSI")) %>%
   pivot_longer(starts_with("avgPSI"), names_to = "condition", names_prefix = "avgPSI_", values_to = "PSI")
+
 df_NMD_avgT <- df_NMD %>% filter(condition == "sgTARDBP")
 df_NMD_dNMD_avgNMD <- df_NMD %>% filter(condition != "sgTARDBP") %>% 
   mutate(facetCol = condition)
@@ -390,7 +407,7 @@ df_NMD_dNMD_avgNMD %>% filter(str_detect(facetCol, "^sgTARDBP")) %>%
                                     "sgTARDBP_shXRN1/shUPF1"))) %>%
   filter(cryptic_exon_id %in% nmdOnlyCEs$cryptic_exon_id) %>%
   ggplot(aes(x = condition, y = PSI)) +
-  geom_point(alpha = 0.5, position = position_jitter(width = 0.2), size=3, color =  "#444444")+
+  geom_point(alpha = 0.5, position = position_jitter(width = 0.15), size=3, color =  "#444444")+
   geom_boxplot(alpha=0.8, outliers = F, fill = "#444444", color = "black",
                outlier.color = "#444444",outlier.size = 1, linewidth=2) +
   scale_color_viridis_d(option = "viridis")+
@@ -402,7 +419,7 @@ df_NMD_dNMD_avgNMD %>% filter(str_detect(facetCol, "^sgTARDBP")) %>%
         plot.margin = margin(0.8, 0.8, 0.8, 0.8, "cm"),
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
-  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25))) +
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25)), lim=c(0,105)) +
     stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP",)
 
 # CE PSI in every condition - Fig S1E
@@ -411,8 +428,8 @@ df_NMD %>% filter(condition != "sgCtrl",
   mutate(condition = factor(condition, 
                            levels=c("Ctrl",
                                     "sgTARDBP",
-                                    "sgTARDBP_shXRN1/shSMG6",
                                     "sgTARDBP_shXRN1",
+                                    "sgTARDBP_shXRN1/shSMG6",
                                     "sgTARDBP_shUPF1/shSMG6",
                                     "sgTARDBP_shXRN1/shUPF1"))) %>%
   ggplot(aes(x = condition, y = PSI)) +
@@ -461,14 +478,22 @@ Use information from GTF file for Release 49 (GRCh38.p14) --> Basic gene annotat
 
 ```{r chrGenes, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6, cache=T}
 ## Load GTF file --> genes only
-gencodeInformation <- rtracklayer::import("data/gencode.v49.basic.annotation.gtf")
+gencodeInformation <- rtracklayer::import("/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/data/gencode.v49.basic.annotation.gtf")
 gencodeInformation <- gencodeInformation[gencodeInformation$type == "gene"]
 
-## Subset to unique genes that are lncRNA, protein coding, or snRNA
+## Subset to unique genes within specific categories (similar to CellRanger filters for gtf)
 unique(gencodeInformation$gene_type)
-gencodeInformation <- gencodeInformation[gencodeInformation$gene_type %in% c("lncRNA", "protein_coding","snRNA")]
+gencodeInformation <- gencodeInformation[gencodeInformation$gene_type %in% c(str_detect(gencodeInformation$gene_type,"pseudogene"),
+                                                                             str_detect(gencodeInformation$gene_type, "IG"),
+                                                                             str_detect(gencodeInformation$gene_type, "TR_"),
+                                                                             "lncRNA", "protein_coding","snRNA")]
 
-chr_df <- data.frame(table(seqnames(gencodeInformation))) %>% filter(Var1 != "chrM") # Remove mitochondrial
+unique_gencodeInformation <- gencodeInformation[,c("gene_type","gene_id","gene_name")] %>% as.data.frame() %>%
+  dplyr::select(!c("start","end","width")) %>% mutate(gene_id = str_split_i(gene_id,"\\.",1)) %>%
+  distinct()
+
+
+chr_df <- data.frame(table(unique_gencodeInformation$seqnames)) %>% filter(Var1 != "chrM") # Remove mitochondrial
 
 ### Graph to compare % CEs on each chromosome and % genes on each chromosome
 df_chr <- data.frame(table(df$chr)) %>% full_join(chr_df, by = "Var1") %>%
@@ -506,7 +531,7 @@ High expressor cryptic exons have a PSI of at least 70% in at least one conditio
 ```{r VisHigh, fig.align = "center", out.width="100%", fig.dpi=300, fig.asp=0.6}
 ## High expressors
 df_high <- df %>% filter(maxPSI_sgTARDBP > 70 &  maxPSI_Ctrl < 10) 
-# write.csv(df_high,"output_tables/251224_CrypticCoordinates_HighExp.csv")
+# write.csv(df_high,"/Users/irika/Library/CloudStorage/OneDrive-JohnsHopkins/WongLing/Scripts/NMDi_TDP43kd_repo/output_tables/260408_CrypticCoordinates_HighExp.csv")
 
 # There are no skiptics.  - Fig S2B
 pieChartFx((df_high %>% mutate(type = factor(type,c("cassette", "start site", "exon ext.", "polyA"))) %>% 
@@ -526,12 +551,13 @@ df_high %>%
                                     "sgTARDBP_shXRN1",
                                     "sgTARDBP_shXRN1/shSMG6",
                                     "sgTARDBP_shUPF1/shSMG6",
-                                    "sgTARDBP_shXRN1/shUPF1"))) %>%
+                                    "sgTARDBP_shXRN1/shUPF1")),
+         PSI = as.numeric(PSI)) %>%
   ggplot(aes(x = condition, y = PSI)) +
   geom_point(alpha = 0.5, position = position_jitter(width = 0.2), size=3, color =  "#444444")+
   geom_boxplot(alpha=0.8, outliers = F, fill = "#444444", color = "black",
                outlier.color = "#444444",outlier.size = 1, linewidth=2) +
-  scale_color_viridis_d(option = "viridis")+
+  # scale_color_viridis_d(option = "viridis")+
   theme_classic()+ xlab("") + ylab("Average R/L PSI") +
   theme(text = element_text(size = 25, family = "Helvetica"), legend.position = "none",
         axis.line.x = element_blank(),
@@ -541,7 +567,7 @@ df_high %>%
         strip.background = element_rect(fill = "#02153D", colour = "#02153D"),
         strip.text = element_text(color="white"), panel.spacing = unit(0.3, "cm"))+
   stat_compare_means(label = "p.signif", method = "t.test", ref.group = "sgTARDBP")+
-  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25)))
+  geom_hline(yintercept=0, linetype="dotted")+scale_y_continuous(breaks=c(seq(-50,100,25)), lim = c(-5,110))
 
 
 ```
@@ -584,7 +610,7 @@ orderGenes <- pheatmap(t(as.matrix(nauc_highCE_mat)),
          treeheight_col = 0,
          breaks = seq(0,10,0.1)
          )
-crypticHighOrder <- data.frame(gene = orderGenes$tree_col$labels[orderGenes$tree_col$order])
+
 
 # Choose highest PSI CE for a gene with multiple in high expressors
 maxPSI <- df_high %>% filter(ensembl_id %in% nauc_highCE$gene_id) %>%
@@ -599,19 +625,30 @@ for(i in 1:nrow(maxPSI)){
 maxPSI <- df_high[maxCE,]
 
 # Still two duplicates due to same max - rmove the ones at a lower PSI after TDP kd only
-maxPSI <- maxPSI %>% filter(!(cryptic_exon_id %in% c("CE140","CE359"))) 
+maxPSI <- maxPSI %>% filter(!(cryptic_exon_id %in% c("CE139","CE356"))) 
 maxPSI <- maxPSI[,c(1,7:17)]
 colnames(maxPSI)[1] = "gene"
 
 # MERGE WITH ORDERED DF
-maxPSI$gene[13] = "CTB-50L17.10"
-maxPSI$gene[10] = "C20orf194"
+maxPSI$gene[which(maxPSI$gene == "HDGFL2")] = "CTB-50L17.10"
+maxPSI$gene[which(maxPSI$gene == "DNAAF9")] = "C20orf194"
 
+crypticHighOrder <- data.frame(gene = orderGenes$tree_col$labels[orderGenes$tree_col$order])
 crypticHighOrder <- left_join(crypticHighOrder, maxPSI, by = "gene") %>% 
-  column_to_rownames("gene") 
+  column_to_rownames("gene") %>% dplyr::select(!avgPSI_sgCtrl) 
+crypticHighOrder <- crypticHighOrder %>% dplyr::select(paste0("avgPSI_", 
+                                                              c("Ctrl", "shXRN1", "shXRN1/shSMG6", "shUPF1/shSMG6", "shXRN1/shUPF1", "sgTARDBP", 
+                                                                paste0("sgTARDBP_",
+                                                                       c("shXRN1", "shXRN1/shSMG6", "shUPF1/shSMG6", "shXRN1/shUPF1")))))
+
 
 breaksList = seq(0, 100, by = 1)
-pheatmap((t(as.matrix(crypticHighOrder[,-6]))), 
+matrix_numeric <- matrix(as.numeric(as.matrix(crypticHighOrder)), nrow = nrow(crypticHighOrder))
+rownames(matrix_numeric) = rownames(crypticHighOrder)
+colnames(matrix_numeric) = colnames(crypticHighOrder)
+matrix_numeric[which(is.na(matrix_numeric))] = 0
+
+pheatmap((t(matrix_numeric)), 
          color = viridis(length(breaksList),option="F"),
          border_color = NA, 
          cluster_rows = F,
@@ -665,14 +702,14 @@ pheatmap(t(as.matrix(nauc_NMD)),
 df_PSI <- df_NMDce %>% 
   filter(gene_symbol %in% c("CYFIP2", "NRXN2", "MTMR3", "NADSYN1", "ENAH", "PBX1")) %>%
   dplyr::select(c(gene_symbol, cryptic_exon_id,starts_with("avg"))) %>%
-  filter(!(cryptic_exon_id %in% c("CE092", "CE093","CE266"))) %>% # MANUAL SELECTION OF STRONGEST CE 
+  filter(!(cryptic_exon_id %in% c("CE090", "CE091","CE264"))) %>% # MANUAL SELECTION OF STRONGEST CE 
   dplyr::select(-cryptic_exon_id) %>%
   arrange(gene_symbol, levels = c("CYFIP2", "NRXN2", "MTMR3", "NADSYN1", "ENAH", "PBX1")) %>%
   pivot_longer(starts_with("avgPSI_"), names_to = "cond", values_to = "psi") %>%
   filter(cond != "avgPSI_sgCtrl") %>%
   mutate(cond = factor(cond, c("avgPSI_Ctrl",
                                "avgPSI_shXRN1","avgPSI_shXRN1/shSMG6",
-                               "avgPSI_shUPF1/shSMG6","savgPSI_shXRN1/shUPF1",
+                               "avgPSI_shUPF1/shSMG6","avgPSI_shXRN1/shUPF1",
                                "avgPSI_sgTARDBP",
                                "avgPSI_sgTARDBP_shXRN1", "avgPSI_sgTARDBP_shXRN1/shSMG6",
                                "avgPSI_sgTARDBP_shUPF1/shSMG6", "avgPSI_sgTARDBP_shXRN1/shUPF1"))) %>%
@@ -683,7 +720,12 @@ df_PSI <- df_NMDce %>%
 # Note: if some of your genes are outside of this range, they will appear white on the heatmap
 breaksList = seq(0, 30, by = 0.1)
 
-pheatmap(t(as.matrix(df_PSI)), 
+matrix_numeric <- matrix(as.numeric(as.matrix(df_PSI)), nrow = nrow(df_PSI))
+rownames(matrix_numeric) = rownames(df_PSI)
+colnames(matrix_numeric) = colnames(df_PSI)
+matrix_numeric[which(is.na(matrix_numeric))] = 0
+
+pheatmap(t(as.matrix(matrix_numeric)), 
          cluster_cols = F,
          cluster_rows = F,
          fontsize = 12,
